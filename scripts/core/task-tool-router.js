@@ -57,7 +57,7 @@ function addTools(target, names) {
  * @param {Array} allSchemas Full ToolRegistry schema list
  * @returns {Array} Filtered schemas in registry order
  */
-export function selectToolSchemasForTurn(messages, allSchemas) {
+export function selectToolSchemasForTurn(messages, allSchemas, phase = 'initial') {
   if (!Array.isArray(allSchemas)) return allSchemas;
 
   const text = getLatestUserText(messages);
@@ -73,7 +73,15 @@ export function selectToolSchemasForTurn(messages, allSchemas) {
   if (!explicitlyReadOnly && INTENT_PATTERNS.authoring.test(text)) {
     addTools(selected, AUTHORING_TOOLS);
   }
-  if (INTENT_PATTERNS.assets.test(text)) addTools(selected, ASSET_TOOLS);
+  const wantsAssets = INTENT_PATTERNS.assets.test(text);
+  const documentDependentAssetRequest =
+    wantsAssets &&
+    /\b(find|locate|identify|get|use|from)\b/i.test(text) &&
+    /\b(document|compendium|manual|actor|item|journal|creature|monster|npc)\b/i.test(text);
+
+  if (wantsAssets && (!documentDependentAssetRequest || phase === 'after_document')) {
+    addTools(selected, ASSET_TOOLS);
+  }
   if (INTENT_PATTERNS.automation.test(text)) addTools(selected, AUTOMATION_TOOLS);
   if (INTENT_PATTERNS.admin.test(text)) addTools(selected, ADMIN_TOOLS);
 
