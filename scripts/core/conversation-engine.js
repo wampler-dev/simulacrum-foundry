@@ -85,6 +85,7 @@ class ConversationEngine {
     // tools on the first completion so the model cannot rediscover known facts.
     const userText = this._getLastUserText();
     const resolvedContext = await this._buildResolvedReadOnlyContext();
+    const turnTools = selectToolSchemasForTurn(userText, toolRegistry.getToolSchemas());
     const initialMessages = resolvedContext
       ? [
           ...this.conversationManager.getMessages(),
@@ -97,14 +98,14 @@ class ConversationEngine {
       mutationRequest: this._isMutationRequest(userText),
       indexStatus: referenceIndexService.getStatus(),
       resolved: !!resolvedContext,
-      initialTools: resolvedContext ? 'none' : 'registry',
+      initialTools: resolvedContext ? 'none' : turnTools.map(t => t?.function?.name ?? t?.name),
       contextPreview: resolvedContext?.slice(0, 500) ?? null,
     });
 
     let aiResponse = await SimulacrumCore.generateResponse(initialMessages, {
       signal,
       onAssistantMessage,
-      ...(resolvedContext ? { tools: null } : {}),
+      tools: resolvedContext ? null : turnTools,
       referenceDiagnostic: true,
     });
 
@@ -171,7 +172,7 @@ class ConversationEngine {
 
     // With tools: delegate to tool loop (let the loop emit assistant/tool updates)
     // Note: tool-loop-handler now handles adding assistant messages with tool_calls
-    const tools = toolRegistry.getToolSchemas();
+    const tools = turnTools;
     const legacyMode = game?.settings?.get('simulacrum', 'legacyMode') ?? false;
     const currentToolSupport = !legacyMode;
 
