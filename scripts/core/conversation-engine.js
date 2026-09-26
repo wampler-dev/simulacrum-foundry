@@ -9,6 +9,7 @@ import { SimulacrumCore } from './simulacrum-core.js';
 import { processToolCallLoop } from './tool-loop-handler.js';
 import { toolRegistry } from './tool-registry.js';
 import { referenceIndexService } from './reference-index-service.js';
+import { selectToolSchemasForTurn } from './task-tool-router.js';
 import { createLogger } from '../utils/logger.js';
 
 const logger = createLogger('ConversationEngine');
