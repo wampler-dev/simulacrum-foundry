@@ -25,6 +25,7 @@ import {
 import { emitProcessStatus, emitRetryStatus, SimulacrumHooks } from './hook-manager.js';
 import { interactionLogger } from './interaction-logger.js';
 import { executeToolCalls, storeToolJustification } from './tool-execution.js';
+import { refineToolSchemasAfterResults } from './task-tool-router.js';
 // Re-export for existing importers (chat-handler); the store lives in tool-execution.js.
 export { retrieveToolJustification } from './tool-execution.js';
 
@@ -366,6 +367,10 @@ You cannot respond without a tool call. Either continue with the next tool in yo
     successful: toolResults.filter(r => r.success).length,
     toolNames: toolResults.map(r => r.toolName),
   });
+
+  // Once deterministic reference resolution supplies artwork metadata, remove
+  // redundant asset-discovery capabilities for the remainder of this turn.
+  context.tools = refineToolSchemasAfterResults(context.userText, context.tools, toolResults);
 
   // 5. Handle Execution Failures
   if (toolResults.some(r => !r.success)) {
