@@ -82,6 +82,125 @@ export class ReferenceIndexService {
       .map(({ record, score }) => ({ ...record, score }));
   }
 
+  /**
+   * Search references without forcing a source choice.
+   * @param {{query:string, documentType?:string, limit?:number}} options
+   * @returns {Array<object>} ranked references
+   */
+  search({ query, documentType, limit = 50 }) {
+    return this.resolve({ name: query, documentType, limit });
+  }
+
+  /**
+   * Group search results by authoritative package provenance.
+   * @param {{query:string, documentType?:string, limit?:number}} options
+   * @returns {Array<object>} source groups with compact matches
+   */
+  groupBySource({ query, documentType, limit = 200 }) {
+    const matches = this.search({ query, documentType, limit });
+    const groups = new Map();
+
+    for (const match of matches) {
+      const key = match.packageId || match.packageTitle || 'unknown';
+      if (!groups.has(key)) {
+        groups.set(key, {
+          packageId: match.packageId,
+          packageTitle: match.packageTitle,
+          matches: [],
+        });
+      }
+      groups.get(key).matches.push(match);
+    }
+
+    return [...groups.values()].sort((a, b) =>
+      String(a.packageTitle).localeCompare(String(b.packageTitle))
+    );
+  }
+
+  /**
+   * Detect installed package/source names mentioned in natural user text.
+   * Longest/highest-confidence source matches are returned first.
+   * @param {string} text
+   * @returns {Array<object>} detected installed sources
+   */
+  detectSources(text) {
+    const normalizedText = normalizeSource(text);
+    const sources = new Map();
+
+    for (const record of this.records) {
+      const key = record.packageId || record.packageTitle;
+      if (!key || sources.has(key)) continue;
+
+      const aliases = [
+        normalizeSource(record.packageTitle),
+        normalizeSource(record.packageId),
+      ].filter(Boolean);
+
+      const score = Math.max(
+        ...aliases.map(alias => this._scoreSourceInText(normalizedText, alias))
+      );
+      if (!score) continue;
+
+      sources.set(key, {
+        packageId: record.packageId,
+        packageTitle: record.packageTitle,
+        score,
+      });
+    }
+
+    return [...sources.values()].sort(
+      (a, b) => b.score - a.score || a.packageTitle.localeCompare(b.packageTitle)
+    );
+  }
+
+  /**
+   * Resolve a natural phrase by first detecting an installed source and then
+   * removing that source phrase before reference-name matching.
+   * @param {{text:string, documentType?:string, limit?:number}} options
+   * @returns {{source: object|null, query: string, matches: Array<object>}}
+   */
+  resolveText({ text, documentType, limit = 10 }) {
+    const sources = this.detectSources(text);
+    const source = sources[0] ?? null;
+    let query = normalizeSource(text);
+
+    if (source) {
+      const aliases = [
+        normalizeSource(source.packageTitle),
+        normalizeSource(source.packageId),
+      ].filter(Boolean);
+      for (const alias of aliases.sort((a, b) => b.length - a.length)) {
+        query = query.replace(alias, ' ').replace(/\s+/g, ' ').trim();
+      }
+    }
+
+    query = query
+      .replace(/\b(find|locate|identify|show|tell|about|from|the|an|a|in|of)\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const matches = this.resolve({
+      name: query,
+      source: source?.packageTitle,
+      documentType,
+      limit,
+    });
+
+    return { source, query, matches };
+  }
+
+  _scoreSourceInText(text, source) {
+    if (!text || !source) return 0;
+    if (text === source) return 1000 + source.length;
+    if (text.includes(source)) return 500 + source.length;
+
+    const sourceTokens = source.split(' ');
+    const textTokens = new Set(text.split(' '));
+    if (sourceTokens.length < 2) return 0;
+    if (sourceTokens.every(token => textTokens.has(token))) return 200 + source.length;
+    return 0;
+  }
+
   _score(record, name, source, documentType) {
     const nameScore = scoreField(record.normalizedName, name);
     if (!nameScore) return 0;
