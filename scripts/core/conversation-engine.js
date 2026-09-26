@@ -50,7 +50,10 @@ class ConversationEngine {
       await referenceIndexService.rebuild();
     }
 
-    const result = referenceIndexService.resolveTextCompact({ text, limit: 10 });
+    let result = referenceIndexService.resolveTextCompact({ text, limit: 10 });
+    if (!result.source || result.matches.length === 0) {
+      result = referenceIndexService.resolveMentionedCompact({ text, limit: 10 });
+    }
     if (!result.source || result.matches.length === 0) return null;
 
     return [
