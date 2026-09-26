@@ -8,6 +8,7 @@
 import { SimulacrumCore } from './simulacrum-core.js';
 import { processToolCallLoop } from './tool-loop-handler.js';
 import { toolRegistry } from './tool-registry.js';
+import { selectToolSchemasForTurn } from './task-tool-router.js';
 import { appendEmptyContentCorrection, appendToolFailureCorrection } from './correction.js';
 import {
   isToolCallFailure,
@@ -39,10 +40,19 @@ class ConversationEngine {
   async processTurn(options = {}) {
     const { signal, onAssistantMessage, onToolResult } = options;
 
+    // Select one stable, task-scoped toolbox for the entire user turn.
+    // An explicit options.tools value still takes precedence.
+    const allTools = toolRegistry.getToolSchemas();
+    const turnTools =
+      options.tools !== undefined
+        ? options.tools
+        : selectToolSchemasForTurn(this.conversationManager.getMessages(), allTools);
+
     // Get initial assistant response
     let aiResponse = await SimulacrumCore.generateResponse(this.conversationManager.getMessages(), {
       signal,
       onAssistantMessage,
+      tools: turnTools,
     });
 
     // Pre-tool correction loop (bounded) - handles parse errors and tool call failures
@@ -70,6 +80,7 @@ class ConversationEngine {
         }
         aiResponse = await SimulacrumCore.generateResponse(this.conversationManager.getMessages(), {
           signal,
+          tools: turnTools,
         });
       } finally {
         emitProcessStatus('end', callId);
@@ -108,7 +119,7 @@ class ConversationEngine {
 
     // With tools: delegate to tool loop (let the loop emit assistant/tool updates)
     // Note: tool-loop-handler now handles adding assistant messages with tool_calls
-    const tools = toolRegistry.getToolSchemas();
+    const tools = turnTools;
     const legacyMode = game?.settings?.get('simulacrum', 'legacyMode') ?? false;
     const currentToolSupport = !legacyMode;
 
