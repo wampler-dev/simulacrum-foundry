@@ -120,3 +120,23 @@ test('document type is a hard constraint when supplied', () => {
     []
   );
 });
+
+
+test('D&D shorthand resolves Dungeons & Dragons package title and package id', () => {
+  const service = new ReferenceIndexService();
+  service.records = [
+    record({
+      packageTitle: 'Dungeons & Dragons Monster Manual',
+      normalizedPackageTitle: 'dungeons and dragons monster manual',
+    }),
+  ];
+
+  const results = service.resolve({
+    name: 'Goblin Warrior',
+    source: 'D&D Monster Manual',
+    documentType: 'Actor',
+  });
+
+  assert.equal(results.length, 1);
+  assert.equal(results[0].packId, 'dnd-monster-manual.actors');
+});
