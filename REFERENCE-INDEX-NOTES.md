@@ -42,3 +42,18 @@ The compact reference should include, when available:
 - prototype-token image
 
 No LLM call is required for this resolution.
+
+
+## Live Foundry acceptance result — 2026-09-26
+
+A live index of 12,068 references across 10 installed package sources rebuilt in approximately 4.03 seconds.
+
+Acceptance results:
+- Natural text "Find the Goblin Warrior from the D&D Monster Manual" detected package `dnd-monster-manual`, reduced the reference query to `goblin warrior`, and returned exactly the Monster Manual Goblin Warrior.
+- Explicit source resolution returned exactly one Monster Manual Goblin Warrior with the correct UUID, portrait, and token.
+- Unconstrained `Goblin Warrior` preserved three exact-name alternatives from D&D Fifth Edition, Heroes of the Borderlands, and Dungeons & Dragons Monster Manual.
+- Broad `Goblin` results grouped by package provenance.
+- An invalid explicit source returned no substitution.
+- The prior Hobgoblin substring collision was eliminated with token-boundary matching.
+
+This validates the reference-index architecture independently of any LLM or tool-selection behavior.
