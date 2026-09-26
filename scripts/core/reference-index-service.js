@@ -26,8 +26,8 @@ function normalizeSource(value) {
 function scoreField(candidate, query) {
   if (!query) return 0;
   if (candidate === query) return 100;
-  if (candidate.startsWith(query) || query.startsWith(candidate)) return 70;
-  if (candidate.includes(query) || query.includes(candidate)) return 50;
+  if (candidate.startsWith(query)) return 70;
+  if (candidate.includes(query)) return 50;
   return 0;
 }
 
