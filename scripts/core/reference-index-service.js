@@ -41,14 +41,25 @@ export class ReferenceIndexService {
     this.records = [];
     this.built = false;
     this.lastBuildTime = null;
+    this.buildPromise = null;
   }
 
   /**
    * Rebuild the derived reference catalog from current Foundry collections.
    */
   async rebuild() {
-    const records = [];
+    if (this.buildPromise) return this.buildPromise;
 
+    this.buildPromise = this._rebuildInternal();
+    try {
+      return await this.buildPromise;
+    } finally {
+      this.buildPromise = null;
+    }
+  }
+
+  async _rebuildInternal() {
+    const records = [];
     this._indexWorldCollections(records);
 
     for (const pack of game.packs ?? []) {
