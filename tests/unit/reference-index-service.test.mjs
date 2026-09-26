@@ -346,3 +346,20 @@ test('world document records retain world provenance and artwork', () => {
     globalThis.game = previousGame;
   }
 });
+
+
+test('concurrent rebuild calls share one in-flight build', async () => {
+  const service = new ReferenceIndexService();
+  let builds = 0;
+  service._rebuildInternal = async () => {
+    builds++;
+    await new Promise(resolve => setTimeout(resolve, 5));
+    service.built = true;
+    return 42;
+  };
+
+  const [a, b] = await Promise.all([service.rebuild(), service.rebuild()]);
+  assert.equal(a, 42);
+  assert.equal(b, 42);
+  assert.equal(builds, 1);
+});
