@@ -85,6 +85,41 @@ export class ReferenceIndexService {
   }
 
   /**
+   * Return an LLM-safe compact reference without internal normalized fields.
+   * @param {object} record
+   * @returns {object}
+   */
+  compact(record) {
+    return {
+      name: record.name,
+      uuid: record.uuid,
+      documentType: record.documentType,
+      subtype: record.subtype,
+      packId: record.packId,
+      packLabel: record.packLabel,
+      packageId: record.packageId,
+      packageTitle: record.packageTitle,
+      img: record.img,
+      tokenImg: record.tokenImg,
+      score: record.score,
+    };
+  }
+
+  /**
+   * Resolve natural text and return only compact reference metadata.
+   * @param {{text:string, documentType?:string, limit?:number}} options
+   * @returns {{source:object|null,query:string,matches:Array<object>}}
+   */
+  resolveTextCompact(options) {
+    const result = this.resolveText(options);
+    return {
+      source: result.source,
+      query: result.query,
+      matches: result.matches.map(record => this.compact(record)),
+    };
+  }
+
+  /**
    * Return a compact status summary for diagnostics and UI integration.
    * @returns {{built:boolean,count:number,lastBuildTime:string|null,sources:number}}
    */
