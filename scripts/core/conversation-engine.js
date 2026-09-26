@@ -104,6 +104,7 @@ class ConversationEngine {
       signal,
       onAssistantMessage,
       ...(resolvedContext ? { tools: null } : {}),
+      referenceDiagnostic: true,
     });
 
     // Pre-tool correction loop (bounded) - handles parse errors and tool call failures
