@@ -363,3 +363,56 @@ test('concurrent rebuild calls share one in-flight build', async () => {
   assert.equal(b, 42);
   assert.equal(builds, 1);
 });
+
+
+test('compound Goblin Warrior request resolves the embedded named reference', () => {
+  const service = new ReferenceIndexService();
+  service.records = [
+    record({
+      packageTitle: 'Dungeons & Dragons Monster Manual',
+      normalizedPackageTitle: 'dungeons and dragons monster manual',
+    }),
+    record({
+      name: 'Goblin',
+      normalizedName: 'goblin',
+      uuid: 'Compendium.dnd-monster-manual.actors.Actor.goblin',
+      packageTitle: 'Dungeons & Dragons Monster Manual',
+      normalizedPackageTitle: 'dungeons and dragons monster manual',
+    }),
+  ];
+
+  const result = service.resolveMentionedCompact({
+    text:
+      'Find the Goblin Warrior from the D&D Monster Manual and find an appropriate goblin token or portrait for it. Do not modify anything.',
+  });
+
+  assert.equal(result.source.packageId, 'dnd-monster-manual');
+  assert.equal(result.query, 'goblin warrior');
+  assert.equal(result.matches[0].name, 'Goblin Warrior');
+  assert.equal(result.matches[0].packageId, 'dnd-monster-manual');
+});
+
+test('embedded-name resolution respects token boundaries', () => {
+  const service = new ReferenceIndexService();
+  service.records = [
+    record({
+      name: 'Goblin Warrior',
+      normalizedName: 'goblin warrior',
+      packageTitle: 'Dungeons & Dragons Monster Manual',
+      normalizedPackageTitle: 'dungeons and dragons monster manual',
+    }),
+    record({
+      name: 'Hobgoblin Warrior',
+      normalizedName: 'hobgoblin warrior',
+      uuid: 'Compendium.dnd-monster-manual.actors.Actor.hobgoblin',
+      packageTitle: 'Dungeons & Dragons Monster Manual',
+      normalizedPackageTitle: 'dungeons and dragons monster manual',
+    }),
+  ];
+
+  const result = service.resolveMentionedCompact({
+    text: 'Find the Goblin Warrior from the D&D Monster Manual.',
+  });
+
+  assert.equal(result.matches.some(match => match.name === 'Hobgoblin Warrior'), false);
+});
