@@ -10,6 +10,7 @@ function normalize(value) {
   return String(value ?? '')
     .normalize('NFKD')
     .toLowerCase()
+    .replace(/&/g, ' and ')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
     .replace(/\s+/g, ' ');
@@ -95,15 +96,27 @@ export class ReferenceIndexService {
   }
 
   _getPackSource(pack) {
-    const packageId = pack.metadata?.packageName ?? pack.metadata?.package ?? '';
+    const packageId =
+      pack.metadata?.packageName ??
+      pack.metadata?.package ??
+      pack.metadata?.packageId ??
+      pack.metadata?.packageName ??
+      '';
+
     const pkg =
       game.modules?.get?.(packageId) ??
       (game.system?.id === packageId ? game.system : null) ??
       (game.world?.id === packageId ? game.world : null);
 
+    const metadataTitle =
+      pack.metadata?.packageTitle ??
+      pack.metadata?.packageLabel ??
+      pack.metadata?.packageName ??
+      '';
+
     return {
       packageId,
-      packageTitle: pkg?.title ?? packageId,
+      packageTitle: pkg?.title ?? metadataTitle ?? packageId,
     };
   }
 
