@@ -272,3 +272,26 @@ test('no-match source constraint remains empty instead of substituting another s
     []
   );
 });
+
+
+test('getStatus reports a compact deterministic index summary', () => {
+  const service = new ReferenceIndexService();
+  service.records = [
+    record(),
+    record({
+      packageId: 'dnd5e',
+      normalizedPackageId: 'dnd5e',
+      packageTitle: 'D&D 5e',
+      normalizedPackageTitle: 'd d 5e',
+    }),
+  ];
+  service.built = true;
+  service.lastBuildTime = new Date('2026-09-26T12:00:00Z');
+
+  assert.deepEqual(service.getStatus(), {
+    built: true,
+    count: 2,
+    lastBuildTime: '2026-09-26T12:00:00.000Z',
+    sources: 2,
+  });
+});
