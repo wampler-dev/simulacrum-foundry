@@ -295,3 +295,25 @@ test('getStatus reports a compact deterministic index summary', () => {
     sources: 2,
   });
 });
+
+
+test('resolveTextCompact omits internal normalization fields', () => {
+  const service = new ReferenceIndexService();
+  service.records = [
+    record({
+      packageTitle: 'Dungeons & Dragons Monster Manual',
+      normalizedPackageTitle: 'dungeons and dragons monster manual',
+    }),
+  ];
+
+  const result = service.resolveTextCompact({
+    text: 'Find the Goblin Warrior from the D&D Monster Manual',
+    documentType: 'Actor',
+  });
+
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matches[0].name, 'Goblin Warrior');
+  assert.equal(result.matches[0].packageId, 'dnd-monster-manual');
+  assert.equal('normalizedName' in result.matches[0], false);
+  assert.equal('normalizedPackageTitle' in result.matches[0], false);
+});
