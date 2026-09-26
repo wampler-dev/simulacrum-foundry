@@ -180,6 +180,7 @@ class ConversationEngine {
     const finalResponse = await processToolCallLoop({
       initialResponse: aiResponse,
       tools,
+      userText,
       conversationManager: this.conversationManager,
       aiClient: SimulacrumCore.aiClient,
       getSystemPrompt: SimulacrumCore.getSystemPrompt.bind(SimulacrumCore),
