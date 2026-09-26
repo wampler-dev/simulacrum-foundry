@@ -317,3 +317,32 @@ test('resolveTextCompact omits internal normalization fields', () => {
   assert.equal('normalizedName' in result.matches[0], false);
   assert.equal('normalizedPackageTitle' in result.matches[0], false);
 });
+
+
+test('world document records retain world provenance and artwork', () => {
+  const previousGame = globalThis.game;
+  globalThis.game = { world: { title: 'Test World' } };
+
+  try {
+    const service = new ReferenceIndexService();
+    const result = service._recordFromWorldDocument(
+      {
+        id: 'abc123',
+        uuid: 'Actor.abc123',
+        name: 'World Goblin',
+        type: 'npc',
+        img: 'worlds/test/goblin.webp',
+        prototypeToken: { texture: { src: 'worlds/test/goblin-token.webp' } },
+      },
+      'Actor'
+    );
+
+    assert.equal(result.uuid, 'Actor.abc123');
+    assert.equal(result.packageId, 'world');
+    assert.equal(result.packageTitle, 'Test World');
+    assert.equal(result.img, 'worlds/test/goblin.webp');
+    assert.equal(result.tokenImg, 'worlds/test/goblin-token.webp');
+  } finally {
+    globalThis.game = previousGame;
+  }
+});
