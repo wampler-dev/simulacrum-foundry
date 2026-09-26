@@ -8,6 +8,7 @@
 import { SimulacrumCore } from './simulacrum-core.js';
 import { processToolCallLoop } from './tool-loop-handler.js';
 import { toolRegistry } from './tool-registry.js';
+import { referenceIndexService } from './reference-index-service.js';
 import { appendEmptyContentCorrection, appendToolFailureCorrection } from './correction.js';
 import {
   isToolCallFailure,
@@ -27,6 +28,39 @@ class ConversationEngine {
     this.conversationManager = conversationManager;
   }
 
+  _getLastUserText() {
+    const messages = this.conversationManager.getMessages();
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i]?.role === 'user') return String(messages[i].content ?? '');
+    }
+    return '';
+  }
+
+  _isMutationRequest(text) {
+    return /\b(create|update|modify|change|edit|delete|remove|import|move|copy|set ownership|assign ownership|write)\b/i.test(
+      text
+    );
+  }
+
+  async _buildResolvedReadOnlyContext() {
+    const text = this._getLastUserText();
+    if (!text || this._isMutationRequest(text)) return null;
+
+    if (!referenceIndexService.built) {
+      await referenceIndexService.rebuild();
+    }
+
+    const result = referenceIndexService.resolveTextCompact({ text, limit: 10 });
+    if (!result.source || result.matches.length === 0) return null;
+
+    return [
+      'RESOLVED FOUNDRY REFERENCE CONTEXT',
+      'This reference was resolved mechanically from the current Foundry index.',
+      'Use it directly. Do not rediscover its source, document type, UUID, portrait, or token.',
+      JSON.stringify(result, null, 2),
+    ].join('\n');
+  }
+
   /**
    * Process a user turn. Assumes the caller already added the user message
    * to the conversation.
@@ -39,10 +73,21 @@ class ConversationEngine {
   async processTurn(options = {}) {
     const { signal, onAssistantMessage, onToolResult } = options;
 
-    // Get initial assistant response
-    let aiResponse = await SimulacrumCore.generateResponse(this.conversationManager.getMessages(), {
+    // Mechanically pre-resolve named read-only references before the model sees
+    // the turn. If the compact reference already answers the lookup, suppress
+    // tools on the first completion so the model cannot rediscover known facts.
+    const resolvedContext = await this._buildResolvedReadOnlyContext();
+    const initialMessages = resolvedContext
+      ? [
+          ...this.conversationManager.getMessages(),
+          { role: 'system', content: resolvedContext },
+        ]
+      : this.conversationManager.getMessages();
+
+    let aiResponse = await SimulacrumCore.generateResponse(initialMessages, {
       signal,
       onAssistantMessage,
+      ...(resolvedContext ? { tools: null } : {}),
     });
 
     // Pre-tool correction loop (bounded) - handles parse errors and tool call failures
