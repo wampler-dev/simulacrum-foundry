@@ -29,6 +29,30 @@ import { modelService } from './core/model-service.js';
 const MODULE_ID = 'simulacrum';
 const MODULE_NAME = 'Simulacrum AI Assistant';
 const logger = createLogger('Module');
+const RESOLUTION_WARNING_PREFIX =
+  'Foundry Virtual Tabletop requires a usable window dimensions of 1024px by 768px or greater.';
+
+function suppressFoundryResolutionWarning() {
+  const notifications = globalThis.ui?.notifications;
+  if (!notifications || notifications.__simulacrumResolutionWarningSuppressed) return;
+
+  for (const method of ['error', 'warn']) {
+    const original = notifications[method];
+    if (typeof original !== 'function') continue;
+
+    notifications[method] = function(message, ...args) {
+      if (String(message ?? '').startsWith(RESOLUTION_WARNING_PREFIX)) return undefined;
+      return original.call(this, message, ...args);
+    };
+  }
+
+  Object.defineProperty(notifications, '__simulacrumResolutionWarningSuppressed', {
+    value: true,
+    configurable: true,
+  });
+  logger.info('Suppressed Foundry minimum-resolution notification');
+}
+
 
 /**
  * Validate the endpoint by calling /models and checking for HTTP 200.
@@ -152,6 +176,7 @@ function disableForNonGMUser() {
 }
 
 async function initializeForGMUser() {
+  suppressFoundryResolutionWarning();
   scheduleSimulacrumSidebarRender();
 
   // Validate endpoint - CSS defaults to disabled, this enables if valid
