@@ -63,7 +63,7 @@ export function selectToolSchemasForTurn(messages, allSchemas) {
   addTools(selected, BASE_TOOLS);
   addTools(selected, RESEARCH_TOOLS);
 
-  if (INTENT_PATTERNS.authoring.test(text)) addTools(selected, AUTHORING_TOOLS);
+  const explicitlyReadOnly =\n    /\\b(do not|don't|dont|without)\\s+(modify|change|edit|update|create|write|import)\\b/i.test(text);\n\n  if (!explicitlyReadOnly && INTENT_PATTERNS.authoring.test(text)) {\n    addTools(selected, AUTHORING_TOOLS);\n  }
   if (INTENT_PATTERNS.assets.test(text)) addTools(selected, ASSET_TOOLS);
   if (INTENT_PATTERNS.automation.test(text)) addTools(selected, AUTOMATION_TOOLS);
   if (INTENT_PATTERNS.admin.test(text)) addTools(selected, ADMIN_TOOLS);
