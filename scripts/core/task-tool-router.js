@@ -26,12 +26,14 @@ const ADMIN_TOOLS = [
 ];
 
 const INTENT_PATTERNS = {
-  authoring: /\b(create|make|add|build|edit|update|change|modify|write|populate|import)\b/i,
+  authoring:
+    /\b(create|make|add|build|edit|update|change|modify|write|populate|import)\b/i,
   assets:
     /\b(image|images|portrait|portraits|token|tokens|art|artwork|audio|sound|sounds|music|file|files|asset|assets|map|maps)\b/i,
   automation:
     /\b(macro|macros|javascript|java\s*script|script|scripts|execute\s+(?:a\s+)?macro|run\s+(?:a\s+)?script)\b/i,
-  admin: /\b(delete|remove|move|copy|duplicate|ownership|permission|permissions|access\s+control)\b/i,
+  admin:
+    /\b(delete|remove|move|copy|duplicate|ownership|permission|permissions|access\s+control)\b/i,
 };
 
 function getLatestUserText(messages = []) {
@@ -63,7 +65,14 @@ export function selectToolSchemasForTurn(messages, allSchemas) {
   addTools(selected, BASE_TOOLS);
   addTools(selected, RESEARCH_TOOLS);
 
-  const explicitlyReadOnly =\n    /\\b(do not|don't|dont|without)\\s+(modify|change|edit|update|create|write|import)\\b/i.test(text);\n\n  if (!explicitlyReadOnly && INTENT_PATTERNS.authoring.test(text)) {\n    addTools(selected, AUTHORING_TOOLS);\n  }
+  const explicitlyReadOnly =
+    /\b(do not|don't|dont|without)\s+(modify|change|edit|update|create|write|import)\b/i.test(
+      text
+    );
+
+  if (!explicitlyReadOnly && INTENT_PATTERNS.authoring.test(text)) {
+    addTools(selected, AUTHORING_TOOLS);
+  }
   if (INTENT_PATTERNS.assets.test(text)) addTools(selected, ASSET_TOOLS);
   if (INTENT_PATTERNS.automation.test(text)) addTools(selected, AUTOMATION_TOOLS);
   if (INTENT_PATTERNS.admin.test(text)) addTools(selected, ADMIN_TOOLS);
