@@ -80,3 +80,33 @@ export function selectToolSchemasForTurn(text, schemas) {
     allowed.has(schema?.function?.name ?? schema?.name)
   );
 }
+
+
+function _resolvedArtworkPresent(toolResults) {
+  for (const item of toolResults ?? []) {
+    if (item?.toolName !== 'resolve_reference' || item?.success !== true) continue;
+    const content = item?.result?.content;
+    if (typeof content !== 'string') continue;
+    try {
+      const parsed = JSON.parse(content);
+      if ((parsed.matches ?? []).some(match => match?.img || match?.tokenImg)) return true;
+    } catch (_error) {
+      // A malformed resolver result must not change capability exposure.
+    }
+  }
+  return false;
+}
+
+export function refineToolSchemasAfterResults(text, schemas, toolResults) {
+  const wantsAlternatives =
+    /\b(alternative|alternatives|alternate|another|other|different|more|options)\b/i.test(
+      String(text ?? '')
+    );
+
+  if (wantsAlternatives || !_resolvedArtworkPresent(toolResults)) return schemas ?? [];
+
+  return (schemas ?? []).filter(schema => {
+    const name = schema?.function?.name ?? schema?.name;
+    return name !== 'search_assets' && name !== 'browse_folders';
+  });
+}
