@@ -26,9 +26,14 @@ function normalizeSource(value) {
 function scoreField(candidate, query) {
   if (!query) return 0;
   if (candidate === query) return 100;
+
+  const candidateTokens = candidate.split(' ');
+  const queryTokens = query.split(' ');
+  const tokenMatch = queryTokens.every(token => candidateTokens.includes(token));
+  if (!tokenMatch) return 0;
+
   if (candidate.startsWith(query)) return 70;
-  if (candidate.includes(query)) return 50;
-  return 0;
+  return 50;
 }
 
 export class ReferenceIndexService {
