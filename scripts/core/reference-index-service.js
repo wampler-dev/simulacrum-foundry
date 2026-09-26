@@ -49,6 +49,8 @@ export class ReferenceIndexService {
   async rebuild() {
     const records = [];
 
+    this._indexWorldCollections(records);
+
     for (const pack of game.packs ?? []) {
       const source = this._getPackSource(pack);
       const index = await pack.getIndex({
@@ -64,6 +66,49 @@ export class ReferenceIndexService {
     this.built = true;
     this.lastBuildTime = new Date();
     return records.length;
+  }
+
+  _indexWorldCollections(records) {
+    const collections = game.collections;
+    if (!collections?.values) return;
+
+    for (const collection of collections.values()) {
+      const documentType =
+        collection.documentName ??
+        collection.documentClass?.documentName ??
+        collection.constructor?.documentName ??
+        '';
+      if (!documentType) continue;
+
+      for (const document of collection) {
+        records.push(this._recordFromWorldDocument(document, documentType));
+      }
+    }
+  }
+
+  _recordFromWorldDocument(document, documentType) {
+    const name = document.name ?? '';
+    const img = document.img ?? null;
+    const tokenImg = document.prototypeToken?.texture?.src ?? null;
+
+    return {
+      name,
+      normalizedName: normalize(name),
+      uuid: document.uuid ?? `${documentType}.${document.id}`,
+      documentType,
+      normalizedDocumentType: normalize(documentType),
+      subtype: document.type ?? null,
+      packId: null,
+      normalizedPackId: '',
+      packLabel: null,
+      normalizedPackLabel: '',
+      packageId: 'world',
+      normalizedPackageId: 'world',
+      packageTitle: game.world?.title ?? 'World',
+      normalizedPackageTitle: normalize(game.world?.title ?? 'World'),
+      img,
+      tokenImg,
+    };
   }
 
   /**
