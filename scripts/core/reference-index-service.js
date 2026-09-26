@@ -40,6 +40,7 @@ export class ReferenceIndexService {
   constructor() {
     this.records = [];
     this.built = false;
+    this.lastBuildTime = null;
   }
 
   /**
@@ -61,6 +62,7 @@ export class ReferenceIndexService {
 
     this.records = records;
     this.built = true;
+    this.lastBuildTime = new Date();
     return records.length;
   }
 
@@ -80,6 +82,19 @@ export class ReferenceIndexService {
       .sort((a, b) => b.score - a.score || a.record.name.localeCompare(b.record.name))
       .slice(0, limit)
       .map(({ record, score }) => ({ ...record, score }));
+  }
+
+  /**
+   * Return a compact status summary for diagnostics and UI integration.
+   * @returns {{built:boolean,count:number,lastBuildTime:string|null,sources:number}}
+   */
+  getStatus() {
+    return {
+      built: this.built,
+      count: this.records.length,
+      lastBuildTime: this.lastBuildTime?.toISOString?.() ?? null,
+      sources: new Set(this.records.map(record => record.packageId).filter(Boolean)).size,
+    };
   }
 
   /**
