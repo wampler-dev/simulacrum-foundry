@@ -140,3 +140,27 @@ test('D&D shorthand resolves Dungeons & Dragons package title and package id', (
   assert.equal(results.length, 1);
   assert.equal(results[0].packId, 'dnd-monster-manual.actors');
 });
+
+
+test('specific Goblin Warrior query does not match Hobgoblin Warrior', () => {
+  const service = new ReferenceIndexService();
+  service.records = [
+    record(),
+    record({
+      name: 'Hobgoblin Warrior',
+      normalizedName: 'hobgoblin warrior',
+      uuid: 'Compendium.dnd-monster-manual.actors.Actor.mmHobgoblinWarrior',
+      img: 'modules/dnd-monster-manual/assets/portraits/hobgoblin-warrior.webp',
+      tokenImg: 'modules/dnd-monster-manual/assets/tokens/hobgoblin-warrior.webp',
+    }),
+  ];
+
+  const results = service.resolve({
+    name: 'Goblin Warrior',
+    source: 'D&D Monster Manual',
+    documentType: 'Actor',
+  });
+
+  assert.equal(results.length, 1);
+  assert.equal(results[0].name, 'Goblin Warrior');
+});
