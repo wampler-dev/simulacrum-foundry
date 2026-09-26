@@ -25,6 +25,7 @@ import { RunJavascriptTool } from '../tools/run-javascript.js';
 import { ReadToolOutputTool } from '../tools/read-tool-output.js';
 import { DocumentOwnershipTool } from '../tools/document-ownership.js';
 import { NotifyUserTool } from '../tools/notify-user.js';
+import { ReferenceResolveTool } from '../tools/reference-resolve.js';
 import { DocumentAPI } from './document-api.js';
 
 /**
@@ -71,6 +72,7 @@ export class ToolRegistry {
         new DocumentUpdateTool(),
         new DocumentDeleteTool(),
         new DocumentListTool(),
+        new ReferenceResolveTool(),
         new DocumentSearchTool(),
         new DocumentCopyTool(),
         new DocumentMoveTool(),
