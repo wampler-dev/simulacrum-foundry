@@ -134,6 +134,7 @@ class ConversationEngine {
         }
         aiResponse = await SimulacrumCore.generateResponse(this.conversationManager.getMessages(), {
           signal,
+          tools: turnTools,
         });
       } finally {
         emitProcessStatus('end', callId);
