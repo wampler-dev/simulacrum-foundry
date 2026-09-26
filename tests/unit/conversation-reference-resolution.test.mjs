@@ -22,3 +22,10 @@ test('mutation requests bypass read-only pre-resolution path', () => {
   assert.match(source, /create\|update\|modify\|change\|edit\|delete/);
   assert.match(source, /if \(!text \|\| this\._isMutationRequest\(text\)\) return null/);
 });
+
+
+test('conversation engine carries turnTools through initial response and tool loop', () => {
+  assert.match(source, /const turnTools = selectToolSchemasForTurn/);
+  assert.match(source, /tools: resolvedContext \? null : turnTools/);
+  assert.match(source, /const tools = turnTools/);
+});
