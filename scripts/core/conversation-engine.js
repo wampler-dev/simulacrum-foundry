@@ -9,6 +9,9 @@ import { SimulacrumCore } from './simulacrum-core.js';
 import { processToolCallLoop } from './tool-loop-handler.js';
 import { toolRegistry } from './tool-registry.js';
 import { referenceIndexService } from './reference-index-service.js';
+import { createLogger } from '../utils/logger.js';
+
+const logger = createLogger('ConversationEngine');
 import { appendEmptyContentCorrection, appendToolFailureCorrection } from './correction.js';
 import {
   isToolCallFailure,
@@ -79,6 +82,7 @@ class ConversationEngine {
     // Mechanically pre-resolve named read-only references before the model sees
     // the turn. If the compact reference already answers the lookup, suppress
     // tools on the first completion so the model cannot rediscover known facts.
+    const userText = this._getLastUserText();
     const resolvedContext = await this._buildResolvedReadOnlyContext();
     const initialMessages = resolvedContext
       ? [
@@ -86,6 +90,15 @@ class ConversationEngine {
           { role: 'system', content: resolvedContext },
         ]
       : this.conversationManager.getMessages();
+
+    logger.info('[ReferencePreResolution]', {
+      userText,
+      mutationRequest: this._isMutationRequest(userText),
+      indexStatus: referenceIndexService.getStatus(),
+      resolved: !!resolvedContext,
+      initialTools: resolvedContext ? 'none' : 'registry',
+      contextPreview: resolvedContext?.slice(0, 500) ?? null,
+    });
 
     let aiResponse = await SimulacrumCore.generateResponse(initialMessages, {
       signal,
