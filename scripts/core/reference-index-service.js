@@ -16,6 +16,13 @@ function normalize(value) {
     .replace(/\s+/g, ' ');
 }
 
+function normalizeSource(value) {
+  const canonical = String(value ?? '')
+    .replace(/dungeons\s*(?:&|and)\s*dragons/gi, 'dnd')
+    .replace(/d\s*&\s*d/gi, 'dnd');
+  return normalize(canonical);
+}
+
 function scoreField(candidate, query) {
   if (!query) return 0;
   if (candidate === query) return 100;
@@ -59,7 +66,7 @@ export class ReferenceIndexService {
    */
   resolve({ name, source, documentType, limit = 10 }) {
     const normalizedName = normalize(name);
-    const normalizedSource = normalize(source);
+    const normalizedSource = normalizeSource(source);
     const normalizedType = normalize(documentType);
 
     return this.records
@@ -83,10 +90,10 @@ export class ReferenceIndexService {
 
     if (source) {
       const sourceScore = Math.max(
-        scoreField(record.normalizedPackageTitle, source),
-        scoreField(record.normalizedPackageId, source),
-        scoreField(record.normalizedPackLabel, source),
-        scoreField(record.normalizedPackId, source)
+        scoreField(normalizeSource(record.packageTitle), source),
+        scoreField(normalizeSource(record.packageId), source),
+        scoreField(normalizeSource(record.packLabel), source),
+        scoreField(normalizeSource(record.packId), source)
       );
       if (!sourceScore) return 0;
       score += sourceScore * 5;
