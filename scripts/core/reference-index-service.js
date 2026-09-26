@@ -295,6 +295,52 @@ export class ReferenceIndexService {
     return { source, query, matches };
   }
 
+  /**
+   * Resolve document names that are mentioned inside a larger natural-language
+   * request. This is intentionally phrase-based rather than substring-based.
+   * @param {{text:string, documentType?:string, limit?:number}} options
+   * @returns {{source:object|null,query:string,matches:Array<object>}}
+   */
+  resolveMentioned({ text, documentType, limit = 10 }) {
+    const normalizedText = normalize(text);
+    const source = this.detectSources(text)[0] ?? null;
+    const normalizedType = normalize(documentType);
+
+    const candidates = this.records
+      .filter(record => !normalizedType || record.normalizedDocumentType === normalizedType)
+      .filter(record => this._containsPhrase(normalizedText, record.normalizedName))
+      .filter(record => {
+        if (!source) return true;
+        return record.packageId === source.packageId;
+      })
+      .map(record => ({
+        ...record,
+        score: 1000 + record.normalizedName.split(' ').length * 100 + record.normalizedName.length,
+      }))
+      .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+      .slice(0, limit);
+
+    return {
+      source,
+      query: candidates[0]?.normalizedName ?? '',
+      matches: candidates,
+    };
+  }
+
+  resolveMentionedCompact(options) {
+    const result = this.resolveMentioned(options);
+    return {
+      source: result.source,
+      query: result.query,
+      matches: result.matches.map(record => this.compact(record)),
+    };
+  }
+
+  _containsPhrase(text, phrase) {
+    if (!text || !phrase) return false;
+    return ` ${text} `.includes(` ${phrase} `);
+  }
+
   _scoreSourceInText(text, source) {
     if (!text || !source) return 0;
     if (text === source) return 1000 + source.length;
