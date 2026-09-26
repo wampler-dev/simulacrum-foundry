@@ -207,6 +207,18 @@ class SimulacrumCore {
         }
       } catch {}
 
+      if (options.referenceDiagnostic) {
+        this.logger.info('[ReferencePreResolutionGenerate]', {
+          toolsOptionProvided: options.tools !== undefined,
+          toolsValue:
+            options.tools === null
+              ? 'null'
+              : Array.isArray(options.tools)
+                ? `array:${options.tools.length}`
+                : typeof options.tools,
+        });
+      }
+
       // Filter blacklisted tools - Ensure AI doesn't see tools explicitly denied
       if (Array.isArray(tools)) {
         const originalCount = tools.length;
