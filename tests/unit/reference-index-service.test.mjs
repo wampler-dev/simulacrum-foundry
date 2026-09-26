@@ -164,3 +164,111 @@ test('specific Goblin Warrior query does not match Hobgoblin Warrior', () => {
   assert.equal(results.length, 1);
   assert.equal(results[0].name, 'Goblin Warrior');
 });
+
+
+test('groupBySource preserves provenance for broad Goblin searches', () => {
+  const service = new ReferenceIndexService();
+  service.records = [
+    record({ name: 'Goblin', normalizedName: 'goblin' }),
+    record({
+      name: 'Goblin Boss',
+      normalizedName: 'goblin boss',
+      uuid: 'Compendium.dnd-monster-manual.actors.Actor.goblinBoss',
+    }),
+    record({
+      name: 'Goblin',
+      normalizedName: 'goblin',
+      uuid: 'Compendium.dnd5e.monsters.Actor.goblin',
+      packId: 'dnd5e.monsters',
+      normalizedPackId: 'dnd5e monsters',
+      packageId: 'dnd5e',
+      normalizedPackageId: 'dnd5e',
+      packageTitle: 'D&D 5e',
+      normalizedPackageTitle: 'd d 5e',
+    }),
+  ];
+
+  const groups = service.groupBySource({ query: 'Goblin', documentType: 'Actor' });
+  assert.equal(groups.length, 2);
+  assert.deepEqual(
+    groups.map(group => group.packageId).sort(),
+    ['dnd-monster-manual', 'dnd5e'].sort()
+  );
+});
+
+test('detectSources recognizes installed D&D Monster Manual in natural text', () => {
+  const service = new ReferenceIndexService();
+  service.records = [
+    record({
+      packageTitle: 'Dungeons & Dragons Monster Manual',
+      normalizedPackageTitle: 'dungeons and dragons monster manual',
+    }),
+    record({
+      packageId: 'dnd5e',
+      normalizedPackageId: 'dnd5e',
+      packageTitle: 'D&D 5e',
+      normalizedPackageTitle: 'd d 5e',
+    }),
+  ];
+
+  const sources = service.detectSources(
+    'Find the Goblin Warrior from the D&D Monster Manual'
+  );
+
+  assert.equal(sources[0].packageId, 'dnd-monster-manual');
+});
+
+test('resolveText mechanically resolves natural source-constrained request', () => {
+  const service = new ReferenceIndexService();
+  service.records = [
+    record({
+      packageTitle: 'Dungeons & Dragons Monster Manual',
+      normalizedPackageTitle: 'dungeons and dragons monster manual',
+    }),
+    record({
+      uuid: 'Compendium.dnd5e.actors24.Actor.goblinWarrior',
+      packId: 'dnd5e.actors24',
+      normalizedPackId: 'dnd5e actors24',
+      packageId: 'dnd5e',
+      normalizedPackageId: 'dnd5e',
+      packageTitle: 'D&D 5e',
+      normalizedPackageTitle: 'd d 5e',
+    }),
+  ];
+
+  const result = service.resolveText({
+    text: 'Find the Goblin Warrior from the D&D Monster Manual',
+    documentType: 'Actor',
+  });
+
+  assert.equal(result.source.packageId, 'dnd-monster-manual');
+  assert.equal(result.query, 'goblin warrior');
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matches[0].packId, 'dnd-monster-manual.actors');
+});
+
+test('no-match source constraint remains empty instead of substituting another source', () => {
+  const service = new ReferenceIndexService();
+  service.records = [
+    record({
+      name: 'Goblin',
+      normalizedName: 'goblin',
+      uuid: 'Compendium.dnd5e.monsters.Actor.goblin',
+      packId: 'dnd5e.monsters',
+      normalizedPackId: 'dnd5e monsters',
+      packageId: 'dnd5e',
+      normalizedPackageId: 'dnd5e',
+      packageTitle: 'D&D 5e',
+      normalizedPackageTitle: 'd d 5e',
+    }),
+  ];
+
+  assert.deepEqual(
+    service.resolve({
+      name: 'Goblin Warrior',
+      source: 'D&D Monster Manual',
+      documentType: 'Actor',
+    }),
+    []
+  );
+});
