@@ -25,6 +25,7 @@ try {
 import { InteractionLogDownloader } from './core/interaction-logger.js';
 import { assetIndexService } from './core/asset-index-service.js';
 import { modelService } from './core/model-service.js';
+import { referenceIndexService } from './core/reference-index-service.js';
 
 const MODULE_ID = 'simulacrum';
 const MODULE_NAME = 'Simulacrum AI Assistant';
@@ -204,6 +205,12 @@ async function initializeForGMUser() {
   // Initialize asset index service in background (non-blocking)
   // Search tool will await the index if called before it's ready
   assetIndexService.initialize();
+
+  // Build the lightweight reference catalog in the background.
+  // resolve_reference will await a rebuild if it is called before this completes.
+  referenceIndexService.rebuild().catch(error => {
+    logger.warn('Reference index background rebuild failed', error);
+  });
 
   const version = game.modules.get(MODULE_ID)?.version ?? 'unknown';
   logger.info(`${MODULE_NAME} v${version} is ready! [build:${BUILD_HASH}]`);
