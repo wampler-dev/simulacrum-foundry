@@ -14,7 +14,7 @@ test('conversation engine pre-resolves read-only named references', () => {
 });
 
 test('pre-resolved read-only first completion suppresses model tools', () => {
-  assert.match(source, /resolvedContext \? \{ tools: null \} : \{\}/);
+  assert.match(source, /tools: resolvedContext .* null .* turnTools/);
 });
 
 test('mutation requests bypass read-only pre-resolution path', () => {
