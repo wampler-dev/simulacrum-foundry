@@ -29,8 +29,8 @@ const schemas = ALL_TOOL_NAMES.map(name => ({
   function: { name, parameters: { type: 'object' } },
 }));
 
-function namesFor(prompt) {
-  return selectToolSchemasForTurn([{ role: 'user', content: prompt }], schemas).map(
+function namesFor(prompt, phase = 'initial') {
+  return selectToolSchemasForTurn([{ role: 'user', content: prompt }], schemas, phase).map(
     schema => schema.function.name
   );
 }
@@ -42,21 +42,27 @@ test('research prompt exposes only research/base tools', () => {
   );
 });
 
-test('document plus portrait request composes research and asset tools', () => {
-  assert.deepEqual(
-    namesFor(
-      'Find the Goblin Warrior from the D&D Monster Manual and find an appropriate goblin token or portrait for it. Do not modify anything.'
-    ),
-    [
-      'read_document',
-      'list_documents',
-      'search_documents',
-      'search_assets',
-      'browse_folders',
-      'read_tool_output',
-      'end_loop',
-    ]
-  );
+test('document-dependent asset request gates asset tools until document resolution', () => {
+  const prompt =
+    'Find the Goblin Warrior from the D&D Monster Manual and find an appropriate goblin token or portrait for it. Do not modify anything.';
+
+  assert.deepEqual(namesFor(prompt), [
+    'read_document',
+    'list_documents',
+    'search_documents',
+    'read_tool_output',
+    'end_loop',
+  ]);
+
+  assert.deepEqual(namesFor(prompt, 'after_document'), [
+    'read_document',
+    'list_documents',
+    'search_documents',
+    'search_assets',
+    'browse_folders',
+    'read_tool_output',
+    'end_loop',
+  ]);
 });
 
 test('authoring request adds structured authoring tools without unrelated capabilities', () => {
