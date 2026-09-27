@@ -14,6 +14,7 @@ import { throwIfAborted } from '../utils/retry-helpers.js';
 import { toolPermissionManager, PermissionState } from './tool-permission-manager.js';
 import { interactionLogger } from './interaction-logger.js';
 import { isToolResultSuccess } from '../utils/tool-result-status.js';
+import { compactToolStatus, retainToolOutput } from '../utils/tool-output-bounds.js';
 
 const logger = createLogger('ToolLoop');
 
@@ -62,6 +63,7 @@ export async function executeToolCalls(toolCalls, context) {
     const toolName = toolCall?.function?.name || toolCall?.name;
     const toolArgs = toolCall?.function?.arguments ?? toolCall?.arguments;
     let result = null;
+    let resultForConversation = null;
     let isSuccess = false;
     let error = null;
     let executionStart = 0;
@@ -214,7 +216,7 @@ export async function executeToolCalls(toolCalls, context) {
 
       // Context Compaction: Store large outputs in buffer, inject reference
       // IMPORTANT: Store BEFORE truncation so read_tool_output can access full content
-      let resultForConversation = result;
+      resultForConversation = result;
       const resultStr = JSON.stringify(result);
       const TOKEN_THRESHOLD = 1000; // ~4000 chars
       const estimatedTokens = Math.ceil(resultStr.length / 4);
@@ -224,24 +226,26 @@ export async function executeToolCalls(toolCalls, context) {
         estimatedTokens > TOKEN_THRESHOLD &&
         conversationManager.toolOutputBuffer
       ) {
-        // Store the FULL content before truncation (preserves newlines for pagination)
+        // Retain a bounded portion with an explicit truncation marker for paging.
         const contentToStore = typeof result.content === 'string' ? result.content : resultStr;
-        conversationManager.toolOutputBuffer.set(toolCall.id, contentToStore);
+        const retained = retainToolOutput(conversationManager.toolOutputBuffer, toolCall.id, contentToStore);
 
         // Create compact reference
-        const lines = contentToStore.split('\n');
+        const lines = retained.retained.split('\n');
         const preview = lines.slice(0, 5).join('\n');
 
         resultForConversation = {
           _compacted: true,
           success: isSuccess,
-          ...(result.error != null ? { error: result.error } : {}),
-          ...(result.partial != null ? { partial: result.partial } : {}),
-          display: result.display || null, // Preserve display for formatted rendering on refresh
+          ...compactToolStatus(result),
+          display: typeof result.display === 'string' && result.display.length <= 500
+            ? result.display : 'Large tool output retained in part; narrow the original request if needed.',
           total_lines: lines.length,
           total_chars: resultStr.length,
+          retained_chars: retained.retained.length,
+          storage_truncated: retained.truncated,
           preview: preview.substring(0, 500),
-          access: `Use read_tool_output(tool_call_id="${toolCall.id}", start_line, end_line) to read full content`,
+          access: `Use read_tool_output(tool_call_id="${toolCall.id}", start_line, end_line) to page retained content; refine the original request if storage_truncated is true`,
         };
       } else {
         // For smaller outputs AND read_tool_output results, truncate for conversation context
@@ -263,6 +267,7 @@ export async function executeToolCalls(toolCalls, context) {
       error = err;
       logger.error(`Tool execution failed for ${toolName}:`, err);
       result = { error: err.message, toolName, arguments: toolArgs };
+      resultForConversation = result;
       if (currentToolSupport === true) {
         conversationManager.addMessage('tool', JSON.stringify(result), null, toolCall.id);
         await conversationManager.save();
@@ -279,7 +284,7 @@ export async function executeToolCalls(toolCalls, context) {
     if (onToolResult) {
       await onToolResult({
         role: 'tool',
-        content: JSON.stringify(result),
+        content: JSON.stringify(resultForConversation),
         toolCallId: toolCall.id,
         toolName,
       });

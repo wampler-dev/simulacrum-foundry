@@ -9,6 +9,7 @@
 import { defaultTokenizer } from '../utils/tokenizer.js';
 import { createLogger, isDebugEnabled } from '../utils/logger.js';
 import { interactionLogger } from './interaction-logger.js';
+import { restoreToolOutputs } from '../utils/tool-output-bounds.js';
 
 const logger = createLogger('Conversation');
 const MAX_COMPACTION_ROUNDS = 10;
@@ -406,6 +407,7 @@ class ConversationManager {
    */
   async save() {
     const key = this.getPersistenceKey();
+    this.toolOutputBuffer = restoreToolOutputs(Array.from(this.toolOutputBuffer.entries()));
     const state = {
       activeMessages: this.activeMessages,
       rollingSummary: this.rollingSummary,
@@ -480,7 +482,7 @@ class ConversationManager {
       // v2: Tiered context architecture
       this.activeMessages = Array.isArray(state.activeMessages) ? state.activeMessages : [];
       this.rollingSummary = typeof state.rollingSummary === 'string' ? state.rollingSummary : '';
-      this.toolOutputBuffer = new Map(state.toolOutputBuffer || []);
+      this.toolOutputBuffer = restoreToolOutputs(state.toolOutputBuffer);
       this.sessionTokens = Number.isFinite(state.sessionTokens) ? state.sessionTokens : 0;
       // Sync messages for backward compatibility
       this.messages = [...this.activeMessages];

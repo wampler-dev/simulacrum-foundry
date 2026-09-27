@@ -15,7 +15,7 @@ export class ReadToolOutputTool extends BaseTool {
   constructor() {
     super(
       'read_tool_output',
-      'Read a portion of a previously stored tool output by line range. When a tool produces output that exceeds the context window, it is compacted and stored with a reference ID. Use this tool with that reference ID to retrieve specific line ranges. Request 200 lines or fewer per call to avoid truncation.',
+      'Read a bounded portion of a retained tool output by line range or character range. Only recent output is kept; large outputs may be truncated in storage. Use character ranges for a long single line.',
       null,
       false
     );
@@ -37,15 +37,17 @@ export class ReadToolOutputTool extends BaseTool {
         start_line: {
           type: 'integer',
           description:
-            'The starting line number to read from (1-indexed). Use 1 for the first chunk.',
+            'Starting line (1-indexed). Supply with end_line, or use start_char/end_char instead.',
         },
         end_line: {
           type: 'integer',
           description:
-            'The ending line number to read to (1-indexed, inclusive). For a 200-line chunk starting at line 1, use 200.',
+            'Inclusive ending line (1-indexed). Use with start_line.',
         },
+        start_char: { type: 'integer', minimum: 1, description: 'Optional 1-indexed start character for long single-line output.' },
+        end_char: { type: 'integer', minimum: 1, description: 'Optional inclusive end character. Use with start_char, at most 10000 characters.' },
       },
-      required: ['tool_call_id', 'start_line', 'end_line'],
+      required: ['tool_call_id'],
     });
   }
 
@@ -55,18 +57,23 @@ export class ReadToolOutputTool extends BaseTool {
    * @returns {Promise<Object>} Result of the tool execution
    */
   async execute(params) {
-    const { tool_call_id, start_line, end_line } = params;
+    const { tool_call_id, start_line, end_line, start_char, end_char } = params;
 
     // Validate parameters
     if (!tool_call_id || typeof tool_call_id !== 'string') {
       return this.handleError('tool_call_id is required and must be a string', 'ValidationError');
     }
 
-    if (!Number.isInteger(start_line) || start_line < 1) {
+    const charMode = start_char !== undefined || end_char !== undefined;
+    if (charMode && (!Number.isInteger(start_char) || start_char < 1 || !Number.isInteger(end_char) ||
+        end_char < start_char || end_char - start_char + 1 > 10000)) {
+      return this.handleError('Character range must be positive, ascending, and at most 10000 characters', 'ValidationError');
+    }
+    if (!charMode && (!Number.isInteger(start_line) || start_line < 1)) {
       return this.handleError('start_line must be a positive integer', 'ValidationError');
     }
 
-    if (!Number.isInteger(end_line) || end_line < start_line) {
+    if (!charMode && (!Number.isInteger(end_line) || end_line < start_line)) {
       return this.handleError('end_line must be >= start_line', 'ValidationError');
     }
 
@@ -85,8 +92,18 @@ export class ReadToolOutputTool extends BaseTool {
     }
 
     const fullOutput = buffer.get(tool_call_id);
+    if (charMode) {
+      if (start_char > fullOutput.length) return this.handleError('start_char exceeds retained output length', 'ValidationError');
+      const end = Math.min(end_char, fullOutput.length);
+      return {
+        success: true, content: fullOutput.slice(start_char - 1, end),
+        display: `Reading characters ${start_char}-${end} of ${fullOutput.length} retained characters`,
+        showing: `${start_char}-${end}`, has_more: end < fullOutput.length,
+      };
+    }
     const lines = fullOutput.split('\n');
     const totalLines = lines.length;
+    if (start_line > totalLines) return this.handleError('start_line exceeds retained output lines', 'ValidationError');
 
     // Clamp end_line to actual line count
     const effectiveEndLine = Math.min(end_line, totalLines);
@@ -112,7 +129,7 @@ export class ReadToolOutputTool extends BaseTool {
       showing: `${start_line}-${effectiveEndLine}`,
       has_more: effectiveEndLine < totalLines,
       truncated: wasTruncated
-        ? `Output truncated at ${MAX_OUTPUT_CHARS} chars. Request smaller line ranges.`
+        ? `Output truncated at ${MAX_OUTPUT_CHARS} chars. Request smaller line ranges or use start_char/end_char for a long line.`
         : undefined,
     };
   }

@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, M1, M3, M4, M8, and M9 owner-accepted. H7 live validation is pending by owner direction. M2 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, M1, M2, M3, M4, M8, and M9 owner-accepted for implemented code. H7 live validation is pending by owner direction. M7 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -402,6 +402,15 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: tests/regression/document-read-contract.test.mjs exercises world and pack shaped documents, omitted/full API option, exact AC/HP field paths, missing fields, embedded inclusion/exclusion, full-snapshot registry compatibility, and oversized output. The M3 search-to-read tests still pass. Regression 57/57 plus compaction budget, integration 14/14, security 19/19, component 1/1, and policy passed; git whitespace check passed.
 - Limits: output is bounded but the host document is still loaded fully before projection, and JSON line pagination remains coarse. A single selected field exceeding the limit must be narrowed through another mechanism; M7 owns broader output storage/paging. Live Foundry v14 metadata and D&D5e paths are unverified; H7 browser validation remains pending.
 - Commit: the commit containing this entry and M2 code is titled “fix: select and bound document reads (M2)”.
+- Status: **Owner accepted for now** on 2026-09-27: “Accept it for now. Continue.” The implementation was accepted with live Foundry v14/D&D5e behavior and the separately tracked pack-read permission candidate still open. Continuation was scoped to M7.
+
+### M7 implementation — 2026-09-27
+
+- Authorization: the owner accepted M2 for now and directed continuation. This authorizes M7 only.
+- Disposition: **Bound existing output buffer and display path**. Large tool content is retained for up to four recent calls, at most 64000 original characters per call plus an explicit truncation marker. The same bounds apply before saving user flags and when loading older saved buffers. New large results send a compact status/preview/access reference to both model history and UI callback rather than delivering the full payload to the sidebar. The compact result records whether storage was truncated; large error/partial/display metadata is bounded. read_tool_output can retrieve retained line ranges or a 10000-character range for long single-line output. No new external storage or indexing service was added.
+- Evidence: tests/regression/bounded-tool-output.test.mjs drives a 200000-character result through executor, conversation save/load, and read_tool_output; checks compact history/UI payloads, retained-size/truncation marker, character paging, eviction, and bounding of legacy saved entries. The M8 result-status tests still pass. Regression 59/59 plus compaction budget, integration 14/14, security 19/19, component 1/1, and policy passed; git whitespace check passed.
+- Limits: truncation loses the tail of a single over-limit result; the compact reference explicitly says to refine the original request. Legacy activeMessages and interaction diagnostic logs may still contain large older payloads; L5 owns diagnostics and H5 owns outgoing history compaction. No live browser persistence/reload measurement or actual Foundry flag-size validation occurred. H7 remains pending.
+- Commit: the commit containing this entry and M7 code is titled “fix: bound retained and displayed tool output (M7)”.
 - Status: **Awaiting owner acceptance**. No other finding was closed.
 
 ### Newly observed candidate — pack read permissions (investigate with separate authorization)
