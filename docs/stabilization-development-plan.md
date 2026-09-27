@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1 resolved by owner-approved removal. Other tasks remain unauthorized.**
+Status: **Required scope; C1 resolved. C2 verification complete, awaiting owner acceptance. Other tasks remain unauthorized.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -242,3 +242,16 @@ No scope expansion and no new task without the owner's explicit permission.
 - Remaining: C2's registration path was removed as a consequence of disabling discovery, but C2 is not declared resolved; its final disposition and any future restoration require separate owner authorization. No other finding is claimed fixed.
 - Owner acceptance: on 2026-09-27, the owner stated “I approve. Track the changes you make in our development plan. Once done, let me know.” following the C1 completion report.
 - Status: **Resolved by owner-approved removal**. Live Foundry/D&D5e/Ollama validation remains outstanding and is not claimed by this closure. All other findings retain their prior status; this acceptance does not authorize C2 or another implementation task.
+
+
+### C2 verification and disposition — 2026-09-27
+
+- Authorization: owner said “Please continue.” after the report explicitly identified C2 as the next task awaiting authorization. Work was scoped to C2.
+- Disposition: **Remove**, reusing C1's removal in d40406096d5c485a494b44ddc20597c4ddcdf825. No additional application code or registration abstraction is needed. The former macro manager unregistered built-ins before registering macro-defined replacements; that entire registration path is gone. The retained manager cannot scan, register, or execute macros.
+- Existing mechanism retained: ToolRegistry already rejects duplicate registered names. The explicit execute_macro tool remains classified as destructive by its tool identity, independently of the target macro's name. This is not a claim that the registry is a sandbox against trusted JavaScript calling its public registration API.
+- Changes in this task: added tests/security/macro-registration.test.mjs and this plan entry. The commit containing these changes is titled “test: verify removal of macro registration bypass (C2)”.
+- Behavioral evidence: three scenarios use the real ToolRegistry and default tools with world/pack macro configurations named read_document, execute_macro, and unprefixed_custom_tool. Initialization and refresh preserve the built-in instances and advertised schemas, register no custom tools, and execute no macros. Duplicate registration is rejected by the existing registry.
+- Dispatch evidence: the real executeToolCalls dispatcher, permission manager, and registered ExecuteMacroTool are exercised with an explicit deny setting. Target names read_document and unprefixed_custom_tool both produce denied history/results with zero macro lookups or executions. Only diagnostic logging is mocked; Foundry globals are fixtures.
+- Verification: security tier **8/8 passed** (four new C2 checks); required-test policy and whitespace checks passed. These are Node behavioral tests, not live Foundry or browser approval-dialog tests. No claim is made about unresolved general capability-routing findings.
+- Restoration constraint: automatic custom macro tools must remain disabled. Any future restoration needs separately authorized inert configuration, collision protection, and execution policy based on actual tool origin/capability; the former naming convention is insufficient.
+- Status: **Awaiting owner acceptance** of removal as the C2 resolution. No other finding was implemented or closed. Next planned task is H1, which requires explicit authorization.
