@@ -36,7 +36,7 @@ export class DocumentReadTool extends BaseTool {
         },
         fields: {
           type: 'array', minItems: 1, items: { type: 'string' },
-          description: 'Optional dot-path fields to return, such as ["name", "system.attributes.ac.value", "prototypeToken.texture.src"]. Missing fields are listed explicitly.',
+          description: 'Optional dot-path fields to return, such as ["name", "system.attributes.ac.value", "prototypeToken.texture.src"]. Missing paths include bounded hints from the serialized data. Missing does not mean the statistic is absent; do not replace missing document facts with model knowledge.',
         },
         view: {
           type: 'string', enum: ['artwork'],
@@ -45,7 +45,7 @@ export class DocumentReadTool extends BaseTool {
         pack: {
           type: 'string',
           description:
-            'The compendium pack ID if reading from a compendium (e.g., "dnd5e.monsters"). Omit to read from the world.',
+            'The compendium pack ID if reading from a compendium (copy from search results). Omit to read from the world.',
         },
         startLine: {
           type: 'integer',
@@ -173,18 +173,39 @@ export class DocumentReadTool extends BaseTool {
       }
       const fields = Object.create(null);
       const missingFields = [];
+      const fieldHints = [];
       for (const path of params.fields) {
         const value = path.split('.').reduce((part, key) =>
           part != null && Object.hasOwn(Object(part), key) ? part[key] : undefined, data);
-        if (value === undefined) missingFields.push(path);
+        if (value === undefined) {
+          missingFields.push(path);
+          if (fieldHints.length < 5) fieldHints.push(this._missingFieldHint(data, path));
+        }
         else fields[path] = value;
       }
-      selected = { documentType: params.documentType, documentId: id, ...(params.pack ? { pack: params.pack } : {}), fields, missingFields };
+      selected = { documentType: params.documentType, documentId: id, ...(params.pack ? { pack: params.pack } : {}), fields, missingFields,
+        ...(missingFields.length ? { fieldHints,
+          guidance: 'These paths are absent from serialized data, not proof the statistic is absent. Check the available fields or read the nearest parent; do not invent a value. Prepared/derived values may not be serialized.' } : {}) };
     }
     const json = JSON.stringify(selected, null, 2);
 
     if (!params.startLine && !params.endLine) return json;
     return this._paginateContent(json, params.startLine, params.endLine);
+  }
+
+  _missingFieldHint(data, requestedPath) {
+    let parent = data;
+    const parts = [];
+    for (const key of requestedPath.split('.')) {
+      if (parent == null || !Object.hasOwn(Object(parent), key)) break;
+      parent = parent[key];
+      parts.push(key);
+    }
+    const parentPath = parts.join('.');
+    const keys = parent && typeof parent === 'object' && !Array.isArray(parent) ? Object.keys(parent) : [];
+    return { requestedPath, parentPath,
+      availableFields: keys.slice(0, 20).map(key => parentPath ? `${parentPath}.${key}` : key),
+      truncated: keys.length > 20 };
   }
 
   _paginateContent(json, startLine, endLine) {

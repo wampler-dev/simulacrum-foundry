@@ -12,7 +12,7 @@ class DocumentListTool extends BaseTool {
   constructor() {
     super(
       'list_documents',
-      'List documents by type, returning names, IDs, and UUID references. Use this to browse or inventory documents when you do not have a specific search term — for targeted text searches, use `search_documents` instead. Omit `documentType` to list all available document types with counts. Pass `documentType` as "Compendium" to list available compendium packs.',
+      'List documents by type, returning names, IDs, and UUID references. Use this to browse or inventory documents when you do not have a specific search term — for targeted text searches, use `search_documents` instead. Omit `documentType` to list all available document types with counts. Pass `documentType` as "Compendium" to discover installed pack IDs and their owning modules/systems before choosing a source.',
       {
         type: 'object',
         properties: {
@@ -35,7 +35,7 @@ class DocumentListTool extends BaseTool {
           pack: {
             type: 'string',
             description:
-              'A specific compendium pack ID to list documents from (e.g., "dnd5e.monsters"). When set, only documents from this pack are returned.',
+              'A specific compendium pack ID to list documents from (copy an ID returned by compendium discovery). When set, only documents from this pack are returned.',
           },
         },
       }
@@ -213,7 +213,7 @@ class DocumentListTool extends BaseTool {
     if (packs.length === 0) return 'No Compendium Packs found.';
 
     const lines = packs.map(p => {
-      return `- **${p.title}** (${p.id}) [${p.documentName}, ${p.count} docs]`;
+      return `- **${p.title}** (${p.id}) — ${p.packageTitle} (${p.packageId}) [${p.documentName}, ${p.count} docs]`;
     });
 
     return '**Available Compendium Packs**:\n' + lines.join('\n');

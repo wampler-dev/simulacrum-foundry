@@ -53,19 +53,19 @@ export class DocumentAPI {
   static listPacks(documentType) {
     if (!game?.packs) return [];
 
-    // Convert Map to Array
-    const packs = Array.from(game.packs);
-
-    // Filter if type specified
-    const filtered = documentType ? packs.filter(p => p.documentName === documentType) : packs;
-
-    // Map to simplified objects
-    return filtered.map(p => ({
-      id: p.metadata.id, // e.g., "dnd5e.heroes"
-      title: p.metadata.title || p.title,
-      documentName: p.documentName,
-      count: p.index.size, // Note: index size is O(1), efficient
-    }));
+    return Array.from(game.packs)
+      .filter(p => (!documentType || p.documentName === documentType) &&
+        p.testUserPermission(game.user, 'OBSERVER'))
+      .map(p => {
+        const packageId = p.metadata?.packageName || p.collection.split('.')[0];
+        const owner = game.modules?.get(packageId) ||
+          (game.system?.id === packageId ? game.system : null);
+        return {
+          id: p.collection, title: p.metadata?.title || p.title,
+          packageId, packageTitle: owner?.title || packageId,
+          documentName: p.documentName, count: p.index.size,
+        };
+      });
   }
 
   /**
@@ -1497,7 +1497,7 @@ export class DocumentAPI {
         source = 'world';
       } else {
         const requested = source.trim().toLowerCase();
-        const candidates = Array.from(game.packs).filter(p => p.testUserPermission(game.user, 'READ') &&
+        const candidates = Array.from(game.packs).filter(p => p.testUserPermission(game.user, 'OBSERVER') &&
           [p.collection, p.metadata?.title || p.title].some(value => typeof value === 'string' && value.trim().toLowerCase() === requested));
         if (candidates.length !== 1) {
           throw new Error(candidates.length ? 'Source title is ambiguous; use a pack ID' : 'No readable pack matches that source');
@@ -1530,7 +1530,7 @@ export class DocumentAPI {
       const packObj = game.packs.get(pack);
       if (!packObj) throw new Error(`Unknown compendium pack: ${pack}`);
       if (Array.isArray(types) && types.length && !types.includes(packObj.documentName)) return results;
-      if (!packObj.testUserPermission(game.user, 'READ')) return results;
+      if (!packObj.testUserPermission(game.user, 'OBSERVER')) return results;
 
       const index = await packObj.getIndex({ fields });
       for (const idx of index) {
@@ -1588,7 +1588,7 @@ export class DocumentAPI {
       const packs = source === 'world' ? [] : game.packs.filter(p => p.documentName === t);
       for (const p of packs) {
         // Check pack visibility/permission (User can generally read visible packs)
-        if (!p.testUserPermission(game.user, 'READ')) continue;
+        if (!p.testUserPermission(game.user, 'OBSERVER')) continue;
 
         // Use index for speed
         const index = await p.getIndex({ fields });

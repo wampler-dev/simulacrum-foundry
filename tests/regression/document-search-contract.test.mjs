@@ -17,7 +17,7 @@ function setup(t) {
   const requests = [];
   const packs = [...indexes].map(([collection, index]) => ({
     collection, metadata: { title: collection === 'world.one' ? 'Monster Manual' : 'Other Monsters' },
-    documentName: 'Actor', testUserPermission: () => true,
+    documentName: 'Actor', testUserPermission: (_user, level) => level === 'OBSERVER',
     getIndex: async options => { requests.push({ collection, options }); return index; },
   }));
   packs.get = id => packs.find(pack => pack.collection === id);

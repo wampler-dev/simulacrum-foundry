@@ -37,7 +37,7 @@ test('common read requests offer only the tools needed for their path', () => {
   assert.equal(named.has('read_document'), true);
   assert.equal(named.has('read_tool_output'), true, 'large results can require paging in the same turn');
   assert.equal(named.has('end_loop'), true, 'loop completion remains available');
-  assert.equal(named.has('list_documents'), false);
+  assert.equal(named.has('list_documents'), true);
   assert.equal(named.has('search_assets'), false);
   assert.equal(getTurnToolNames(turn('List all Actor documents')).has('list_documents'), true);
   assert.equal(getTurnToolNames(turn('List all spells')).has('list_documents'), true);

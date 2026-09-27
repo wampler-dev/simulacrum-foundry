@@ -12,7 +12,7 @@ class DocumentSearchTool extends BaseTool {
   constructor() {
     super(
       'search_documents',
-      'Search document names by default. For an exact named reference, set exact=true and optionally source to "world", a pack ID, or an exact pack title; one match supplies identity only, so read_document is still required for facts. Supply indexed field paths for broad searches where available; compendium search uses the pack index, not full contents. Use list_documents to browse without a query.',
+      'Search document names by default. For a requested book/module, first discover its installed pack ID with list_documents(documentType="Compendium") unless already known from tool results. Do not guess pack IDs or substitute a different named document. For an exact named reference, set exact=true and optionally source to "world", a pack ID, or an exact pack title; one match supplies identity only, so read_document is still required for facts. Supply indexed field paths for broad searches where available; compendium search uses the pack index, not full contents. Use list_documents to browse without a query.',
       {
         type: 'object',
         properties: {
@@ -36,7 +36,7 @@ class DocumentSearchTool extends BaseTool {
           pack: {
             type: 'string',
             description:
-              'Restrict the search to a specific compendium pack (e.g., "dnd5e.monsters"). Omit to search the world and all packs.',
+              'Restrict the search to a specific compendium pack (copy an ID from compendium discovery). Omit to search the world and all packs.',
           },
           exact: {
             type: 'boolean', default: false,
@@ -77,6 +77,7 @@ class DocumentSearchTool extends BaseTool {
       });
 
       const resultCount = results.length;
+      const requestedSource = params.pack || params.source || 'all accessible sources';
       if (params.exact === true) {
         const status = resultCount === 0 ? 'No exact match' : resultCount === 1 ? 'One exact match' : 'Ambiguous exact name (at least two matches)';
         const guidance = resultCount === 1
@@ -85,16 +86,18 @@ class DocumentSearchTool extends BaseTool {
             : 'Check the name or source; do not treat a partial name as an exact match.';
         return {
           content: this.formatSearchResults(results, params.query, {
+            requestedSource,
             status: resultCount === 0 ? 'no_match' : resultCount === 1 ? 'unique' : 'ambiguous',
             guidance,
           }),
-          display: `${status}. ${guidance}`,
+          display: `${status}. Searched source: ${requestedSource}. ${guidance}`,
         };
       }
       const maxResults = params.maxResults ?? 50;
-      const summary = `${resultCount >= maxResults ? 'Showing up to' : 'Found'} ${resultCount} document${resultCount !== 1 ? 's' : ''} matching "${params.query}"${resultCount >= maxResults ? '; narrow the search for more' : ''}`;
+      const summary = `${resultCount >= maxResults ? 'Showing up to' : 'Found'} ${resultCount} document${resultCount !== 1 ? 's' : ''} matching "${params.query}" in ${requestedSource}${resultCount >= maxResults ? '; narrow the search for more' : ''}`;
       return {
         content: this.formatSearchResults(results, params.query, {
+          requestedSource,
           status: resultCount === 0 ? 'no_match' : 'results',
           limitReached: resultCount >= maxResults,
           guidance: resultCount >= maxResults
@@ -118,9 +121,9 @@ class DocumentSearchTool extends BaseTool {
    * @param {string} query - Search query
    * @returns {string} Formatted results
    */
-  formatSearchResults(results, query, { status, guidance, limitReached = false }) {
+  formatSearchResults(results, query, { status, guidance, requestedSource, limitReached = false }) {
     return JSON.stringify({
-      query, status, limitReached, guidance,
+      query, status, requestedSource, limitReached, guidance,
       candidates: results.map(doc => {
         const id = doc.id || doc._id;
         if (typeof doc.type !== 'string' || typeof id !== 'string' || !id) {
