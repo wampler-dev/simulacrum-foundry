@@ -22,6 +22,7 @@ import {
   delayWithSignal,
   buildGenericFailureMessage,
 } from '../utils/retry-helpers.js';
+import { looksLikePendingToolAction } from '../utils/pending-action.js';
 
 const MAX_PRE_TOOL_ATTEMPTS = 3;
 const RETRY_DELAYS_MS = [1000, 2000];
@@ -157,6 +158,26 @@ class ConversationEngine {
         if (onAssistantMessage) onAssistantMessage(aiResponse);
         return aiResponse;
       }
+    }
+
+    // A model may narrate an intended tool action without actually emitting
+    // the native call. Retry that narrow case once; ordinary direct answers
+    // remain valid terminal responses.
+    if (
+      (!Array.isArray(aiResponse.toolCalls) || aiResponse.toolCalls.length === 0) &&
+      looksLikePendingToolAction(aiResponse?.content, turnTools)
+    ) {
+      this.conversationManager.addMessage(
+        'developer',
+        'You described a pending tool action but did not call it. If that action is still required, emit the appropriate available tool call now. Otherwise provide the complete final answer.',
+        null,
+        null,
+        { _internal: true }
+      );
+      aiResponse = await SimulacrumCore.generateResponse(this.conversationManager.getMessages(), {
+        signal,
+        tools: turnTools,
+      });
     }
 
     // If no tools, emit assistant and finish
