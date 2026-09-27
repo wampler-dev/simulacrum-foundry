@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, and H1 owner-accepted. H7 mitigation awaiting live validation and owner acceptance. Other tasks remain unauthorized.**
+Status: **Required scope; C1, C2, and H1 owner-accepted. H7 mitigation awaits live validation and owner acceptance; the 2026-09-27 live check was blocked. Other tasks remain unauthorized.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -279,3 +279,12 @@ No scope expansion and no new task without the owner's explicit permission.
 - Remaining: verify DOMPurify availability and the actual browser DOM for final, restored, streaming, tool-card, and confirmation displays with hostile tags, event attributes, and script URLs. Confirm expected markdown, Foundry links, and legitimate tool display formatting survive. A missing sanitizer deliberately degrades rich HTML to escaped text. Do not mark H7 resolved until browser evidence and owner acceptance.
 - Commit: the commit containing this entry and the mitigation is titled “fix: sanitize sidebar display boundaries (H7)”.
 - Status: **Mitigated; awaiting live Foundry validation and owner acceptance**. No other finding was closed.
+
+### H7 live-validation attempt — 2026-09-27
+
+- Authorization: the owner said “Approved. Please continue.” after the current plan identified H7 live browser validation as the immediate next step. This authorized the validation task, not another remediation item.
+- The repository's isolated Playwright workflow requires a licensed Foundry zip in vendor/foundry, tests/e2e/.env.test, and installed Playwright dependencies. All three are absent from this workspace. No isolated Foundry v14 instance could be started here.
+- A cloud-browser attempt to open the previously used address https://foundry.wampler.app was **rejected by automatic browser approval**, not by the owner. The stated reason was that this specific external origin had not been established as the authorized Foundry test environment and might expose private session content. The browser did not open the site. Do not route around that rejection or claim a live check occurred.
+- No live validation results, new browser findings, or application code changes resulted from this attempt. H7 remains mitigated but **open**, and its previously recorded Node tests remain the only runtime evidence.
+- To finish this task, the owner must identify the exact authorized Foundry test URL/environment with the restart branch installed, or provide the licensed isolated test prerequisites through an approved route. Then verify real DOM behavior for final, restored, streaming, pending/result tool-card, and confirmation content, including hostile tags/event attributes/script URLs, plus legitimate markdown and Foundry links. Do not use a production world for destructive probes.
+- Status: **Blocked on an authorized live environment and browser access; awaiting owner acceptance after real validation**. The owner has not approved H7 closure or another task.
