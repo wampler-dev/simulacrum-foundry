@@ -4,7 +4,7 @@
 
 Read [the stabilization development plan](docs/stabilization-development-plan.md) before proposing or performing development work.
 
-The owner has made this plan the sole development priority until every finding has an evidence-backed resolution accepted by the owner. Do not explore or pursue other development goals during that period.
+The owner paused the remaining live validation and runtime investigation on 2026-09-27. The unresolved findings remain open in the plan. Owner-authorized JavaScript enhancements may proceed while those checks are paused, provided each enhancement has a concrete scope and explicit permission. Do not infer that the paused findings are resolved or waive their gates for a release claim.
 
 **A new task requires the owner's explicit permission.** This applies both to individual remediation tasks and to unrelated work. Approval of this plan is documentation authorization, not implementation authorization. Authorization for one task does not authorize other tasks or the rest of the backlog. Completion of the plan does not authorize further development automatically.
 

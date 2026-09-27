@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, and L1–L5 owner-accepted for implemented code or disposition. H7 live validation is pending by owner direction. The narrow M10 recovery fix is accepted, while its runtime assessment remains open pending measurement. The pack read permission candidate and final runtime acceptance remain open. Work dependent on live validation waits; other tasks still require explicit owner permission.**
+Status: **Paused by owner on 2026-09-27 with open runtime gates. C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, and L1–L5 were owner-accepted for implemented code or disposition. H7 live rendering validation, the remaining M10 runtime assessment, the pack read permission candidate, and final runtime acceptance remain open. The owner permits separately authorized JavaScript enhancements during this pause; no specific enhancement has been authorized by the pause itself.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -9,13 +9,17 @@ Reviewed restart commit: `8a58fa9d2f913a2e99aded48106571a8bb7050dc` (baseline pl
 
 ## Binding scope and authorization
 
-This plan is the sole development priority until every finding below has an explicit, evidence-backed resolution accepted by the owner. Do not explore or pursue other development goals in the meantime. **Only the owner's explicit permission allows a new task.** Completion of this plan does not automatically authorize subsequent work.
+The owner paused the remaining live validation and runtime investigation on 2026-09-27 and opened the door to separately authorized JavaScript enhancements. Preserve the unresolved gates and their evidence requirements. Do not describe this pause as closure or claim full Foundry v14/D&D5e/Ollama acceptance from local tests. **Only the owner's explicit permission allows a concrete new task.** Completion of this plan does not automatically authorize subsequent work.
 
 Recording this plan authorizes documentation only. It does not authorize implementation, code changes, dependency changes, feature restoration, or remediation commits. Obtain explicit owner authorization for a concrete task before starting implementation. Authorization for one task does not authorize the rest of the backlog. Read-only inspection and verification necessary to complete an already authorized task remain within that task.
 
 Newly discovered issues may be recorded as blocked candidates; do not silently expand scope or begin work on them. If they block an authorized task, explain the dependency and seek explicit authorization. Do not use refactoring, cleanup, performance work, or test expansion as a route around this rule.
 
 A finding is resolved by a verified fix, removal, consolidation, or an owner-accepted decision to leave it alone supported by evidence. An investigation is not resolved merely because it has been assigned, deferred, or covered by a passing unit test.
+
+### Owner-directed pause — 2026-09-27
+
+The owner said, “We will wait until later then,” regarding the blocked live checks, followed by “I am open to JS enhancements. Can we table the other plan safely for now?” The open checks are tabled until the owner resumes them or provides a reachable test environment. This is a priority change, not a waiver of H7, M10, the pack read permission investigation, or final acceptance. For any separately authorized enhancement, record the specific scope and tests without relabeling an unresolved runtime gate as passed. Reassess affected acceptance scenarios before claiming readiness for use or release.
 
 ## Engineering priorities
 
