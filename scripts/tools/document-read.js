@@ -14,7 +14,7 @@ export class DocumentReadTool extends BaseTool {
   constructor() {
     super(
       'read_document',
-      "Read a document's full data by type and ID. Returns the complete JSON representation including all fields and, optionally, embedded documents (items, pages, effects, etc.). Use `list_documents` or `search_documents` to discover document IDs. This tool must be called before `update_document` or `delete_document` can modify the same document."
+      'Read selected document fields or the document data without embedded collections by default. Set includeEmbedded=true to read embedded collections. Large results require narrower fields or line ranges. This read establishes the source-qualified prerequisite for update/delete.'
     );
     this.logger = createLogger('DocumentReadTool');
     this.schema = {
@@ -32,9 +32,13 @@ export class DocumentReadTool extends BaseTool {
         },
         includeEmbedded: {
           type: 'boolean',
-          default: true,
+          default: false,
           description:
-            'Whether to include embedded documents such as items, pages, effects, and tokens in the response. Defaults to true.',
+            'Include embedded document collections such as items, pages, effects, and tokens. Defaults to false.',
+        },
+        fields: {
+          type: 'array', minItems: 1, items: { type: 'string' },
+          description: 'Optional dot-path fields to return, such as ["name", "system.attributes.ac.value", "prototypeToken.texture.src"]. Missing fields are listed explicitly.',
         },
         pack: {
           type: 'string',
@@ -43,11 +47,13 @@ export class DocumentReadTool extends BaseTool {
         },
         startLine: {
           type: 'integer',
+          minimum: 1,
           description:
             'The starting line number for paginated reading of large documents (1-indexed). Omit to return the full document.',
         },
         endLine: {
           type: 'integer',
+          minimum: 1,
           description:
             'The ending line number for paginated reading (1-indexed, inclusive). Omit to return the full document.',
         },
@@ -82,16 +88,24 @@ export class DocumentReadTool extends BaseTool {
         );
       }
 
-      const document = await this._fetchDocument(documentType, documentId, { pack });
+      const includeEmbedded = parameters.includeEmbedded === true;
+      let fullSnapshot;
+      const document = await this._fetchDocument(documentType, documentId, {
+        pack, includeEmbedded, onFullDocument: snapshot => { fullSnapshot = snapshot; },
+      });
       if (!document) {
         return this._createErrorResponse(documentType, 'DOCUMENT_NOT_FOUND', 'Document not found');
       }
 
-      // Register that this document has been read (for read-before-modify enforcement)
-      const data = typeof document?.toObject === 'function' ? document.toObject() : document;
+      const content = this._formatDocumentContent(document, documentId, { ...parameters, pack });
+      if (content.length + documentType.length + (document?.name || documentId).length + 8 > 12000) {
+        return this._createErrorResponse(documentType, 'READ_TOO_LARGE',
+          'Read output exceeds 12000 characters. Request specific fields or a narrower line range.');
+      }
+      // The mutation prerequisite compares the authoritative full snapshot, even for a selected read.
+      const fullDocument = fullSnapshot || document;
+      const data = typeof fullDocument?.toObject === 'function' ? fullDocument.toObject() : fullDocument;
       documentReadRegistry.registerRead(documentType, documentId, data, pack);
-
-      const content = this._formatDocumentContent(document, documentId, parameters);
       const documentName = document?.name || documentId;
 
       return {
@@ -141,20 +155,39 @@ export class DocumentReadTool extends BaseTool {
 
   _formatDocumentContent(document, id, params) {
     const data = typeof document?.toObject === 'function' ? document.toObject() : document;
-    const json = JSON.stringify(data, null, 2);
+    let selected = data;
+    if (params.fields !== undefined) {
+      if (!Array.isArray(params.fields) || params.fields.length === 0 || params.fields.some(field => typeof field !== 'string' || !field.trim())) {
+        throw new Error('fields must be a non-empty array of dot-path strings');
+      }
+      const fields = Object.create(null);
+      const missingFields = [];
+      for (const path of params.fields) {
+        const value = path.split('.').reduce((part, key) =>
+          part != null && Object.hasOwn(Object(part), key) ? part[key] : undefined, data);
+        if (value === undefined) missingFields.push(path);
+        else fields[path] = value;
+      }
+      selected = { documentType: params.documentType, documentId: id, ...(params.pack ? { pack: params.pack } : {}), fields, missingFields };
+    }
+    const json = JSON.stringify(selected, null, 2);
 
     if (!params.startLine && !params.endLine) return json;
     return this._paginateContent(json, params.startLine, params.endLine);
   }
 
   _paginateContent(json, startLine, endLine) {
+    if ((startLine !== undefined && (!Number.isInteger(startLine) || startLine < 1)) ||
+        (endLine !== undefined && (!Number.isInteger(endLine) || endLine < 1 || endLine < (startLine || 1)))) {
+      throw new Error('startLine and endLine must be positive integers in ascending order');
+    }
     const lines = json.split('\n');
     const total = lines.length;
     const start = Math.max(0, (startLine || 1) - 1);
     const end = endLine ? Math.min(total, endLine) : total;
 
     if (start >= total) {
-      return `[Error: Start line ${start + 1} exceeds line count ${total}]`;
+      throw new Error(`Start line ${start + 1} exceeds line count ${total}`);
     }
 
     const slice = lines.slice(start, end).join('\n');

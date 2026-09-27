@@ -37,6 +37,7 @@ test('search hands world and pack result arguments directly to read', async t =>
   }
   assert.equal(observed[0][2].pack, undefined);
   assert.equal(observed[1][2].pack, 'world.heroes');
+  assert.deepEqual(observed.map(call => call[2].includeEmbedded), [false, false]);
 });
 
 test('read accepts linked and bare top-level UUIDs, rejects mismatched and embedded targets', async t => {

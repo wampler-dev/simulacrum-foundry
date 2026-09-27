@@ -998,11 +998,12 @@ export class DocumentAPI {
    * @param {string} documentType
    * @param {string} id
    * @param {object} [options]
-   * @param {boolean} [options.includeEmbedded=false]
+   * @param {boolean} [options.includeEmbedded=true]
+   * @param {Function} [options.onFullDocument] - Optional same-read snapshot for stale checks
    * @returns {Promise<object>} Plain document object
    */
   static async getDocument(documentType, id, options = {}) {
-    const { includeEmbedded = false, pack } = options;
+    const { includeEmbedded = true, pack } = options;
 
     // SCENARIO 1: Get document from Compendium Pack
     if (pack) {
@@ -1019,8 +1020,8 @@ export class DocumentAPI {
 
       const obj = doc.toObject();
       if (doc.uuid) obj.uuid = doc.uuid;
-
-      return obj;
+      options.onFullDocument?.(obj);
+      return this.#selectEmbeddedData({ ...obj }, doc, includeEmbedded);
     }
 
     // SCENARIO 2: Get document from World Collection
@@ -1052,9 +1053,18 @@ export class DocumentAPI {
 
     const obj = doc.toObject();
     if (doc.uuid) obj.uuid = doc.uuid;
-    if (!includeEmbedded) return obj;
-    // MVP: no deep embedding; return as-is
-    return obj;
+    options.onFullDocument?.(obj);
+    return this.#selectEmbeddedData({ ...obj }, doc, includeEmbedded);
+  }
+
+  static #selectEmbeddedData(data, document, includeEmbedded) {
+    if (includeEmbedded) return data;
+    const embedded = document.constructor?.metadata?.embedded;
+    if (!embedded || typeof embedded !== 'object') {
+      throw new Error('Cannot exclude embedded documents without document metadata');
+    }
+    for (const field of Object.values(embedded)) delete data[field];
+    return data;
   }
 
   /**

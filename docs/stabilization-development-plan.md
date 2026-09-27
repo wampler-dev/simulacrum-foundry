@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, M3, M4, M8, and M9 owner-accepted. H7 live validation is pending by owner direction. M1 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, M1, M3, M4, M8, and M9 owner-accepted. H7 live validation is pending by owner direction. M2 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -393,7 +393,21 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: tests/regression/document-search-contract.test.mjs exercises world and two packs with duplicate IDs, explicit fields, pack/type selection, empty and unmatched queries, broad searches, and a limit that stops before indexing later packs. Regression 54/54 plus compaction budget, integration 14/14, security 19/19, component 1/1, and policy passed; git whitespace check passed.
 - Limits: pack index availability and search permissions are modeled locally, not proven against an installed Foundry v14/D&D5e pack. The bounded result set does not provide pagination or an exact total; use a narrower query. Large document reads remain M2; stored large outputs remain M7. H7 live browser validation remains pending.
 - Commit: the commit containing this entry and M1 code is titled “fix: align and bound document search (M1)”.
+- Status: **Owner accepted** on 2026-09-27: “Accepted, please continue.” The permission to continue was scoped to M2. H7 remains pending.
+
+### M2 implementation — 2026-09-27
+
+- Authorization: the owner accepted M1 and directed continuation. This authorizes M2 only.
+- Disposition: **Simplify/Fix** existing read behavior. read_document defaults to excluding embedded collections, supports explicit dot-path fields with missing paths listed, and forwards includeEmbedded to DocumentAPI. DocumentAPI uses the document class metadata.embedded mapping to remove top-level embedded collections when requested; its omitted-option default remains full data for existing callers. A single host document read supplies both the selected model view and a full same-version snapshot for the source-qualified stale-check registry. Responses over 12000 characters fail with a field/line-range hint before registering the read. Invalid line ranges fail instead of returning success containing an error string.
+- Evidence: tests/regression/document-read-contract.test.mjs exercises world and pack shaped documents, omitted/full API option, exact AC/HP field paths, missing fields, embedded inclusion/exclusion, full-snapshot registry compatibility, and oversized output. The M3 search-to-read tests still pass. Regression 57/57 plus compaction budget, integration 14/14, security 19/19, component 1/1, and policy passed; git whitespace check passed.
+- Limits: output is bounded but the host document is still loaded fully before projection, and JSON line pagination remains coarse. A single selected field exceeding the limit must be narrowed through another mechanism; M7 owns broader output storage/paging. Live Foundry v14 metadata and D&D5e paths are unverified; H7 browser validation remains pending.
+- Commit: the commit containing this entry and M2 code is titled “fix: select and bound document reads (M2)”.
 - Status: **Awaiting owner acceptance**. No other finding was closed.
+
+### Newly observed candidate — pack read permissions (investigate with separate authorization)
+
+- DocumentAPI.getDocument uses pack.getDocument(id) and returns its object without the module-level permission check used for world reads and pack search. It is uncertain whether Foundry v14 getDocument enforces the user’s pack/document read permission at this boundary. This was observed during M2 but no policy change was authorized or made.
+- Before accepting any security claim for pack reads, test a hidden/restricted pack and a non-GM user in an authorized Foundry environment; if the host does not enforce it, add the smallest permission check at the actual boundary. Track this as a blocked candidate until separately authorized. Do not infer exploitability from source inspection alone.
 
 ## Deterministic JavaScript opportunity register (tracking only)
 
