@@ -19,6 +19,8 @@ test('release package is buildable and contains the production module contract',
   for (const required of [
     'module.json',
     'scripts/simulacrum.js',
+    'vendor/dompurify/purify.es.mjs',
+    'vendor/dompurify/LICENSE',
     'styles/simulacrum.css',
     'templates/simulacrum/sidebar.hbs',
     'lang/en.json',

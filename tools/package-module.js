@@ -31,6 +31,7 @@ const include = [
   'module.json',
   'README.md',
   'scripts',
+  'vendor',
   'styles',
   'templates',
   'lang',

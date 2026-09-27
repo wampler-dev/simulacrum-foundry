@@ -189,6 +189,7 @@ jobs:
           cp -r lang dist/${{ env.MODULE_ID }}/
           cp -r packs dist/${{ env.MODULE_ID }}/
           cp -r scripts dist/${{ env.MODULE_ID }}/
+          cp -r vendor dist/${{ env.MODULE_ID }}/
           cp -r styles dist/${{ env.MODULE_ID }}/
           cp -r templates dist/${{ env.MODULE_ID }}/
           cp module.json dist/${{ env.MODULE_ID }}/

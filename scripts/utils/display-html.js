@@ -1,10 +1,13 @@
+import DOMPurify from '../../vendor/dompurify/purify.es.mjs';
+
 /** Sanitize untrusted chat HTML before it enters the sidebar DOM. */
 export function sanitizeDisplayHtml(value) {
   const html = String(value ?? '');
-  const sanitizer = globalThis.DOMPurify;
+  const sanitizer = DOMPurify;
   if (typeof sanitizer?.sanitize === 'function') {
     try {
-      return sanitizer.sanitize(html);
+      const clean = sanitizer.sanitize(html, { USE_PROFILES: { html: true } });
+      if (typeof clean === 'string') return clean;
     } catch (_error) {
       // A failed sanitizer must not turn into a raw HTML fallback.
     }

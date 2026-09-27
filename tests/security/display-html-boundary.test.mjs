@@ -1,3 +1,4 @@
+import DOMPurify from '../../vendor/dompurify/purify.es.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -20,11 +21,11 @@ const { SimulacrumSidebarTab } = await import('../../scripts/ui/simulacrum-sideb
 const payload = '<img src=x onerror="globalThis.attack()"><a href="javascript:attack()">click</a>';
 
 test('HTML detected by markdown renderer is escaped before entering new and restored messages', async t => {
-  const original = Object.getOwnPropertyDescriptor(globalThis, 'DOMPurify');
-  delete globalThis.DOMPurify;
+  const original = Object.getOwnPropertyDescriptor(DOMPurify, 'sanitize');
+  delete DOMPurify.sanitize;
   t.after(() => {
-    if (original) Object.defineProperty(globalThis, 'DOMPurify', original);
-    else delete globalThis.DOMPurify;
+    if (original) Object.defineProperty(DOMPurify, 'sanitize', original);
+    else delete DOMPurify.sanitize;
   });
   assert.equal(await MarkdownRenderer.render(payload), payload);
   const rendered = await processMessageForDisplay(payload);
@@ -37,28 +38,30 @@ test('HTML detected by markdown renderer is escaped before entering new and rest
 });
 
 test('failed or absent sanitizer falls back to encoded text', t => {
-  const original = Object.getOwnPropertyDescriptor(globalThis, 'DOMPurify');
+  const original = Object.getOwnPropertyDescriptor(DOMPurify, 'sanitize');
   t.after(() => {
-    if (original) Object.defineProperty(globalThis, 'DOMPurify', original);
-    else delete globalThis.DOMPurify;
+    if (original) Object.defineProperty(DOMPurify, 'sanitize', original);
+    else delete DOMPurify.sanitize;
   });
-  globalThis.DOMPurify = { sanitize: () => { throw new Error('unavailable'); } };
+  DOMPurify.sanitize = () => { throw new Error('unavailable'); };
   assert.match(sanitizeDisplayHtml(payload), /&lt;img/);
   assert.doesNotMatch(sanitizeDisplayHtml(payload), /<img/);
 });
 
 test('new message, streaming, and tool cards sanitize before their DOM sinks', async t => {
-  const originalSanitizer = Object.getOwnPropertyDescriptor(globalThis, 'DOMPurify');
+  const originalSanitizer = Object.getOwnPropertyDescriptor(DOMPurify, 'sanitize');
   const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
   t.after(() => {
-    for (const [key, descriptor] of [['DOMPurify', originalSanitizer], ['document', originalDocument]]) {
+    if (originalSanitizer) Object.defineProperty(DOMPurify, 'sanitize', originalSanitizer);
+    else delete DOMPurify.sanitize;
+    for (const [key, descriptor] of [['document', originalDocument]]) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor);
       else delete globalThis[key];
     }
   });
   const received = [];
   const wrappers = [];
-  globalThis.DOMPurify = { sanitize: html => { received.push(html); return '<p>clean</p>'; } };
+  DOMPurify.sanitize = html => { received.push(html); return '<p>clean</p>'; };
   globalThis.document = { createElement: () => {
     const wrapper = { dataset: {}, outerHTML: '<div>clean</div>' };
     wrappers.push(wrapper);
