@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, L1, L2, L3, and L4 owner-accepted for implemented code or disposition. H7 live validation is pending by owner direction. The narrow M10 recovery fix is accepted, while its runtime assessment remains open pending measurement. L5 awaits owner acceptance. Work dependent on live validation waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, and L1–L5 owner-accepted for implemented code or disposition. H7 live validation is pending by owner direction. The narrow M10 recovery fix is accepted, while its runtime assessment remains open pending measurement. The pack read permission candidate and final runtime acceptance remain open. Work dependent on live validation waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -501,7 +501,7 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: `tests/regression/interaction-log-bounds.test.mjs` checks normal persisted diagnostics without large duplicate payloads, debug previews, legacy flag loading, eviction, and redaction after debug is disabled. Existing tool-loop integration tests verify the loop reason contract. Regression 69/69, integration 23/23, security 26/26, component 1/1, and policy passed; git whitespace check passed.
 - Limits: debug previews can contain user or tool data by explicit debug policy. Existing persisted flags are bounded on the next load and subsequent save; live Foundry persistence, UI export, and privacy behavior remain unmeasured until H7. This does not change conversation history or console logger output.
 - Commit: the commit containing this entry and logging changes is titled “fix: bound interaction diagnostics (L5)”.
-- Status: **Implemented; awaiting owner acceptance**. No other finding was closed.
+- Status: **Owner accepted** on 2026-09-27: “Accepted, continue.” No independent remediation task remains in the ordered plan. H7 live validation, M10 runtime measurement, the pack read permission candidate, and final runtime acceptance remain pending; this acceptance does not close them or authorize a new task.
 
 ### Newly observed candidate — pack read permissions (investigate with separate authorization)
 
