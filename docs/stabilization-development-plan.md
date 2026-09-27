@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, L1, and L4 owner-accepted for implemented code. H7 live validation is pending by owner direction. The narrow M10 recovery fix is accepted, while its runtime assessment remains open pending measurement. L2 implementation awaits owner acceptance. Work dependent on live validation waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, L1, L2, and L4 owner-accepted for implemented code. H7 live validation is pending by owner direction. The narrow M10 recovery fix is accepted, while its runtime assessment remains open pending measurement. L3 leave-alone disposition awaits owner acceptance. Work dependent on live validation waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -483,7 +483,16 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: tests/regression/document-read-contract.test.mjs validates and executes each example with a matching world/pack Actor fixture, confirming the selected field value. Repository searches found no callers for the removed helpers. Regression 66/66, integration 23/23, security 26/26, component 1/1, and policy passed; git whitespace check passed.
 - Limits: example IDs and pack names are placeholders that users must replace with actual search results. Live Foundry v14/D&D5e execution remains pending with the broader H7 environment validation. No other DocumentAPI or schema behavior was changed.
 - Commit: the commit containing this entry and L2 code is titled “refactor: remove dead read helpers and fix examples (L2)”.
-- Status: **Awaiting owner acceptance**. No other finding was closed.
+- Status: **Owner accepted** on 2026-09-27: “Accepted, continue.” Continuation was scoped to L3.
+
+### L3 assessment — 2026-09-27
+
+- Authorization: the owner accepted L2 and directed continuation. This authorizes L3 assessment only.
+- Disposition: **Leave DocumentAPI reflection and mock-friendly fallbacks alone**. Schema lookup is actively used by `inspect_document_schema` and document creation; world/pack reads and mutations use the same DocumentAPI surface. Replacing the large generic reflection implementation without a reproduced runtime failure would add risk for little demonstrated value. No production code was changed for L3.
+- Evidence: tests/regression/document-schema-reflection.test.mjs exercises a top-level Actor, a dnd5e-shaped NPC subtype field, and an embedded Activity class through `getDocumentSchema`. Existing read/search/create/update tests continue to exercise other DocumentAPI paths. Regression 67/67, integration 23/23, security 26/26, component 1/1, and policy passed; git whitespace check passed.
+- Limits: fixture behavior does not prove Foundry v14/D&D5e runtime metadata, permission behavior, or exhaustive schema coverage. The separately tracked compendium read permission candidate is still open; this leave-alone recommendation does not resolve it. H7 live validation remains pending.
+- Commit: the commit containing this assessment and behavior fixture is titled “test: document schema reflection contract (L3)”.
+- Status: **Leave-alone disposition awaiting owner acceptance**. No other finding was closed.
 
 ### Newly observed candidate — pack read permissions (investigate with separate authorization)
 
