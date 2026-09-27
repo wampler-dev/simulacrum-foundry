@@ -26,6 +26,7 @@ import { ReadToolOutputTool } from '../tools/read-tool-output.js';
 import { DocumentOwnershipTool } from '../tools/document-ownership.js';
 import { NotifyUserTool } from '../tools/notify-user.js';
 import { DocumentAPI } from './document-api.js';
+import { isToolResultSuccess } from '../utils/tool-result-status.js';
 
 /**
  * Tool Registry - Manages all available tools and their registration
@@ -397,8 +398,9 @@ export class ToolRegistry {
       // Execute tool
       const result = await tool.execute(context);
 
-      // Update success stats
-      registration.successCount++;
+      const success = isToolResultSuccess(result);
+      if (success) registration.successCount++;
+      else registration.failureCount++;
 
       this.logger.debug(`[ToolExecution] Tool '${name}' executed successfully`);
       this.logger.debug(`[ToolExecution] Result:`, result);
@@ -406,7 +408,7 @@ export class ToolRegistry {
       // Post-execution hook removed (internal hooks deprecated)
 
       return {
-        success: true,
+        success,
         tool: name,
         executionId,
         result,

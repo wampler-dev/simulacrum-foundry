@@ -13,6 +13,7 @@ import { repairToolCallArguments } from '../utils/ai-normalization.js';
 import { throwIfAborted } from '../utils/retry-helpers.js';
 import { toolPermissionManager, PermissionState } from './tool-permission-manager.js';
 import { interactionLogger } from './interaction-logger.js';
+import { isToolResultSuccess } from '../utils/tool-result-status.js';
 
 const logger = createLogger('ToolLoop');
 
@@ -209,7 +210,7 @@ export async function executeToolCalls(toolCalls, context) {
       const execution = await toolRegistry.executeTool(toolName, parsedArgs);
       result = execution.result;
 
-      isSuccess = !result.error;
+      isSuccess = execution.success !== false && isToolResultSuccess(result);
 
       // Context Compaction: Store large outputs in buffer, inject reference
       // IMPORTANT: Store BEFORE truncation so read_tool_output can access full content
@@ -233,6 +234,9 @@ export async function executeToolCalls(toolCalls, context) {
 
         resultForConversation = {
           _compacted: true,
+          success: isSuccess,
+          ...(result.error != null ? { error: result.error } : {}),
+          ...(result.partial != null ? { partial: result.partial } : {}),
           display: result.display || null, // Preserve display for formatted rendering on refresh
           total_lines: lines.length,
           total_chars: resultStr.length,

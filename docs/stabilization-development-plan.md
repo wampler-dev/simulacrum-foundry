@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, H2, H3, H4, and M3 owner-accepted. H7 live validation is pending by owner direction. M4 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, H2, H3, H4, M3, and M4 owner-accepted. H7 live validation is pending by owner direction. M8 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -357,6 +357,15 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: tests/regression/no-generic-post-verification.test.mjs drives executor create/update result handling and checks that it emits one result per call without invoking a second read. Regression 41/41 plus compaction budget, integration 14/14, security 19/19, and policy passed; git whitespace check passed.
 - Limits: existing create/update readback is a fetch after write; it does not prove field-by-field persistence or atomicity. Live Foundry v14 behavior and partial mutation outcomes remain unverified. M8 owns the result envelope; M9 owns copy/move partial state. Do not imply stronger verification than the returned document supports. H7 remains pending.
 - Commit: the commit containing this entry and M4 code is titled “remove: redundant post-tool verification (M4)”.
+- Status: **Owner accepted** on 2026-09-27: “Accepted, continue on.” The permission to continue was scoped to M8. H7 remains pending.
+
+### M8 implementation — 2026-09-27
+
+- Authorization: the owner accepted M4 and directed continuation. This authorizes M8 only.
+- Disposition: **Consolidate** status interpretation in a small shared predicate. A returned error, explicit success:false/isError/denied, or partial marker is a failure; a successful result has none of those. The registry now counts returned failures and marks their execution unsuccessful. The executor uses that status for loop outcomes and diagnostics. Compacted history preserves success, error, and partial markers. UI card formatting uses the same status for the returned result, including JSON-wrapped callbacks/history. The content/display payload shapes remain as the tools currently emit them.
+- Evidence: tests/regression/tool-result-status.test.mjs exercises returned errors, explicit failure, partial outcomes, thrown errors, success, registry metrics, executor status, history compaction, callback, and failure cards. Regression 43/43 plus compaction budget, integration 14/14, security 19/19, component 1/1, and policy passed; git whitespace check passed.
+- Limits: this aligns classification without converting every tool to a new envelope or claiming partial operations are atomic. Large partial details may remain in persisted output; M7 owns retention bounds. M9 owns copy/move actual identities and side effects; M6 owns retry/termination decisions. H7 browser validation remains pending.
+- Commit: the commit containing this entry and M8 code is titled “fix: align tool result status across boundaries (M8)”.
 - Status: **Awaiting owner acceptance**. No other finding was closed.
 
 ## Deterministic JavaScript opportunity register (tracking only)

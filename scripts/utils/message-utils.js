@@ -2,6 +2,7 @@
  * Smart slicing for message arrays to preserve tool call dependencies.
  * @module utils/message-utils
  */
+import { isToolResultSuccess } from './tool-result-status.js';
 
 /**
  * Smartly slice messages to enforce a token/count limit while preserving dependencies.
@@ -137,18 +138,15 @@ export function formatToolCallDisplay(
   preRenderedContent = null,
   justification = ''
 ) {
-  let isSuccess = !toolResult.isError && !toolResult.error;
+  let isSuccess = isToolResultSuccess(toolResult);
 
   // Enhance success detection by checking content for error signatures
   // (BaseTool returns success:false in content but doesn't set isError on the message object)
   if (isSuccess && typeof toolResult.content === 'string') {
     try {
-      if (
-        toolResult.content.includes('"success":false') ||
-        toolResult.content.includes('"error":')
-      ) {
+      if (toolResult.content.trimStart().startsWith('{')) {
         const parsed = JSON.parse(toolResult.content);
-        if (parsed && (parsed.success === false || parsed.error)) {
+        if (parsed && !isToolResultSuccess(parsed)) {
           isSuccess = false;
         }
       }
