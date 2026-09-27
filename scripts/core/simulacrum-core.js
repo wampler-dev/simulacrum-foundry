@@ -16,7 +16,6 @@ import {
   sanitizeMessagesForFallback,
 } from '../utils/ai-normalization.js';
 import { smartSliceMessages, formatToolCallDisplay } from '../utils/message-utils.js';
-import { processToolCallLoop } from './tool-loop-handler.js';
 import { emitProcessCancelled } from './hook-manager.js';
 import {
   buildSystemPrompt,

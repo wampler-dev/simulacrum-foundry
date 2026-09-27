@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, and L4 owner-accepted for implemented code. H7 live validation is pending by owner direction. M10 has a narrow recovery fix awaiting owner acceptance; its runtime assessment remains open pending measurement. Work dependent on live validation waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, and L4 owner-accepted for implemented code. H7 live validation is pending by owner direction. The narrow M10 recovery fix is accepted, while its runtime assessment remains open pending measurement. L1 removal awaits owner acceptance. Work dependent on live validation waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -36,7 +36,7 @@ When reliability is comparable, prefer **REMOVE > CONSOLIDATE > REUSE EXISTING C
 
 The active path is sidebar input → ChatHandler → ConversationEngine → SimulacrumCore → AIClient's OpenAI-compatible chat completion → autonomous tool loop → tool executor → ToolRegistry → individual tools / DocumentAPI / Foundry → conversation history and UI.
 
-The separate provider classes are not the principal chat transport. ChatInterface initialization was not found on the active path; do not treat its alternate execution code as active without proving a caller. Conversation state and output buffers persist in user flags; diagnostics maintain additional data. Asset indexing is a separate persistent service. Macro discovery can add tools dynamically.
+The separate provider classes are not the principal chat transport. The dormant ChatInterface and alternate ChatHandler execution route were removed under L1; the supported path is the sidebar adapter through ConversationEngine. Conversation state and output buffers persist in user flags; diagnostics maintain additional data. Asset indexing is a separate persistent service. Automatic macro discovery remains disabled under C1.
 
 The clean baseline has no ReferenceIndexService, task-scoped router, targeted field reads, or narrated-action correction from the feature branch. The registry exposes 18 built-in tools plus discovered macro tools; the initial schema filter and later loop schema selection differ.
 
@@ -465,7 +465,16 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: tests/regression/asset-index-recovery.test.mjs simulates old interrupted metadata, invalidation before writes, completion metadata, and restoring completed counts. Regression 65/65, integration 22/22, security 26/26, component 1/1, and policy passed; git whitespace check passed. This is a local IndexedDB test double, not a measured Foundry/browser run.
 - Remaining M10 assessment: the service scans six roots at startup and every five minutes, makes full IndexedDB cursor passes for substring search, and globally wraps FilePicker upload/createDirectory. Successful repeated uploads increment counters even when replacing an existing path; source identity is inferred from path prefixes, so equal path strings across data/public sources may collide. Recursive browse errors are silently skipped and a rebuild can be marked complete despite missing subtrees. Assess actual relevance and latency before changing these mechanisms. Needed live evidence: representative ~15931-file index duration and search latency, normal and repeated upload behavior, interrupted rebuild/reload, stale/external changes, and source-separated paths in the supported Foundry environment. Do not claim a full M10 closure from the metadata test alone.
 - Commit: the commit containing this entry and M10 recovery code is titled “fix: reject interrupted asset index cache (M10)”.
-- Status: **Narrow fix awaiting owner acceptance; M10 investigation remains open** pending live measurement. H7 and work dependent on the live environment remain pending.
+- Status: **Narrow fix owner accepted** on 2026-09-27: “Accepted, continue please.” The remaining M10 runtime investigation is open pending live measurement; continuation was scoped to independent L1. H7 and work dependent on the live environment remain pending.
+
+### L1 removal — 2026-09-27
+
+- Authorization: the owner accepted the narrow M10 recovery fix and directed continuation. This authorizes L1 only.
+- Disposition: **Remove dormant alternate orchestration and UI classes**. `ChatHandler.processUserMessage` is called from the sidebar and delegates to `ConversationEngine`; the older `handleAIResponse`/`handleToolExecution`/recursive retry branch had no repository caller and could bypass H6 turn capabilities. That branch was removed. `scripts/ui/chat-interface.js` and `scripts/ui/confirmation.js` had no imports, module initialization, or call sites; they were removed. Keep `SimulacrumCore.processMessage` as the compatibility entry point, the sidebar `ChatHandler` adapter, and the inline permission confirmation flow in tool-execution.js.
+- Evidence: repository-wide caller and initialization searches found only self-references for the deleted methods/classes. tests/integration/local/active-chat-path.test.mjs drives the supported adapter with one user message and verifies one engine request, one persisted answer, and one UI callback. Regression 65/65, integration 23/23, security 26/26, component 1/1, and policy passed; git whitespace check passed.
+- Limits: repository search cannot establish whether an untracked third-party module imports these internal files directly. No live Foundry sidebar or extension compatibility check occurred; H7 live validation remains pending. The module's exposed `SimulacrumCore.processMessage` contract remains in place.
+- Commit: the commit containing this entry and L1 removal is titled “refactor: remove dormant chat flows (L1)”.
+- Status: **Awaiting owner acceptance**. No other finding was closed.
 
 ### Newly observed candidate — pack read permissions (investigate with separate authorization)
 

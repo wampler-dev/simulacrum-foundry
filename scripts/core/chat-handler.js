@@ -1,5 +1,5 @@
 /* eslint-disable max-depth */
-import { createLogger, isDebugEnabled } from '../utils/logger.js';
+import { createLogger } from '../utils/logger.js';
 import {
   formatToolCallDisplay,
   getToolDisplayContent,
@@ -8,8 +8,7 @@ import {
 import { MarkdownRenderer } from '../lib/markdown-renderer.js';
 import { retrieveToolJustification } from './tool-loop-handler.js';
 /**
- * ChatHandler - Single source of truth for all chat conversation flow
- * Orchestrates between AI, tools, conversation state, and UI
+ * ChatHandler - sidebar-facing adapter for ConversationEngine and tool results.
  */
 
 class ChatHandler {
@@ -115,252 +114,6 @@ class ChatHandler {
       this.addMessageToUI(errorMessage, options);
 
       return errorMessage;
-    }
-  }
-
-  /**
-   * Handle AI response - add to conversation and execute tools if needed
-   */
-  async handleAIResponse(aiResponse, options = {}) {
-    // Skip adding parse errors to conversation/UI (they're for AI correction only)
-    if (aiResponse._parseError) {
-      return await this.handleParseError(aiResponse, options);
-    }
-
-    // Add assistant response to conversation
-    this.addMessageToConversation(
-      'assistant',
-      aiResponse.content,
-      aiResponse.toolCalls,
-      null,
-      aiResponse.provider_metadata
-    );
-
-    // Add to UI
-    await this.addMessageToUI(
-      {
-        role: 'assistant',
-        content: aiResponse.content,
-        display: aiResponse.display || aiResponse.content,
-      },
-      options
-    );
-
-    // Execute tools if present; pass full response so parseError is preserved
-    if (aiResponse.toolCalls && aiResponse.toolCalls.length > 0) {
-      return await this.handleToolExecution(aiResponse, options);
-    }
-
-    // No tools - check if we should continue autonomous loop
-    return await this.handleAutonomousFlow(aiResponse, options);
-  }
-
-  /**
-   * Handle parse errors by continuing AI flow for correction
-   */
-  async handleParseError(parseErrorResponse, options = {}) {
-    if (isDebugEnabled()) {
-      const { createLogger } = await import('../utils/logger.js');
-      const logger = createLogger('ChatHandler');
-      logger.warn('ChatHandler handling parse error:', {
-        parseErrorType: parseErrorResponse._parseError,
-        content: parseErrorResponse.content || '(empty)',
-        hasToolCalls: !!(parseErrorResponse.toolCalls && parseErrorResponse.toolCalls.length > 0),
-        retryCount: options._retryCount || 0,
-      });
-    }
-    // Append assistant failed turn + system correction to conversation
-    const { appendEmptyContentCorrection } = await import('./correction.js');
-    appendEmptyContentCorrection(this.conversationManager, parseErrorResponse);
-
-    // Continue the autonomous flow to get corrected response
-    return await this.handleAutonomousFlow(parseErrorResponse, options);
-  }
-
-  /**
-   * Execute tools and continue conversation flow
-   * Decomposed to reduce complexity
-   */
-  async handleToolExecution(aiResponse, options = {}) {
-    try {
-      const finalResponse = await this._executeToolLoop(aiResponse, options);
-      return await this._processToolLoopOutcome(finalResponse, options);
-    } catch (error) {
-      this.logger.error('Error executing tools', error);
-
-      const errorMessage = {
-        role: 'assistant',
-        content: `Tool execution error: ${error.message}`,
-        display: `${error.message}`,
-      };
-      this.addMessageToConversation('assistant', errorMessage.content);
-      this.addMessageToUI(errorMessage, options);
-      return errorMessage;
-    }
-  }
-
-  async _executeToolLoop(aiResponse, options) {
-    const { processToolCallLoop } = await import('./tool-loop-handler.js');
-    const { SimulacrumCore } = await import('./simulacrum-core.js');
-    const { toolRegistry } = await import('./tool-registry.js');
-
-    const tools = toolRegistry.getToolSchemas();
-    const legacyMode = game?.settings?.get('simulacrum', 'legacyMode') ?? false;
-    const currentToolSupport = !legacyMode;
-
-    // Execute tools and get final response
-    return await processToolCallLoop({
-      initialResponse: aiResponse,
-      tools,
-      conversationManager: this.conversationManager,
-      aiClient: SimulacrumCore.aiClient,
-      getSystemPrompt: SimulacrumCore.getSystemPrompt.bind(SimulacrumCore),
-      currentToolSupport,
-      signal: options.signal,
-      onToolResult: toolResult => this.handleToolResult(toolResult, options),
-      onToolPending: options.onToolPending,
-    });
-  }
-
-  async _processToolLoopOutcome(finalResponse, options) {
-    // Handle tool limit reached error
-    if (finalResponse._toolLimitReachedError) {
-      this.conversationManager.updateSystemMessage(finalResponse.content);
-      const aiSummaryResponse = await this.handleAutonomousFlow(finalResponse, options);
-      // Add the AI's summary to conversation and UI
-      this.addMessageToConversation('assistant', aiSummaryResponse.content);
-      this.addMessageToUI(
-        {
-          role: 'assistant',
-          content: aiSummaryResponse.content,
-          display: aiSummaryResponse.display || aiSummaryResponse.content,
-        },
-        options
-      );
-      return aiSummaryResponse;
-    }
-
-    // Add final response if different from last message
-    if (finalResponse && finalResponse.content) {
-      const lastMessage =
-        this.conversationManager.messages[this.conversationManager.messages.length - 1];
-      if (lastMessage?.role !== 'assistant' || lastMessage?.content !== finalResponse.content) {
-        this.addMessageToConversation(
-          'assistant',
-          finalResponse.content,
-          null,
-          null,
-          finalResponse.provider_metadata
-        );
-        this.addMessageToUI(
-          {
-            role: 'assistant',
-            content: finalResponse.content,
-            display: finalResponse.display || finalResponse.content,
-          },
-          options
-        );
-      }
-    }
-    return finalResponse;
-  }
-
-  /**
-   * Handle autonomous flow continuation (when no tools but should continue)
-   */
-  async handleAutonomousFlow(response, options = {}) {
-    // Check for parse errors that need retry
-    if (response._parseError) {
-      return await this.retryAIResponse(options);
-    }
-
-    // For other autonomous cases, just return the response
-    // This is where we would check for end_task or continue the conversation
-    return response;
-  }
-
-  /**
-   * Retry AI response generation for parse errors
-   */
-  async retryAIResponse(options = {}) {
-    const maxRetries = 3;
-    const currentRetries = (options._retryCount || 0) + 1;
-
-    if (currentRetries > maxRetries) {
-      await this._logRetryExhausted(currentRetries, maxRetries);
-      const errorMessage = {
-        role: 'assistant',
-        content:
-          'Unable to generate a proper response after multiple attempts. Please try rephrasing your request.',
-        display: 'Unable to generate a proper response after multiple attempts.',
-      };
-      this.addMessageToUI(errorMessage, options);
-      return errorMessage;
-    }
-
-    try {
-      const { SimulacrumCore } = await import('./simulacrum-core.js');
-      await this._logRetryAttempt(currentRetries);
-
-      // Get corrected AI response
-      const aiResponse = await SimulacrumCore.generateResponse(
-        this.conversationManager.getMessages(),
-        { signal: options.signal }
-      );
-
-      // Recursively handle the new response with retry tracking
-      return await this.handleAIResponse(aiResponse, {
-        ...options,
-        _retryCount: currentRetries,
-      });
-    } catch (error) {
-      this.logger.error('Error during AI response retry', error);
-
-      const errorMessage = {
-        role: 'assistant',
-        content: `Retry failed: ${error.message}`,
-        display: `Retry failed: ${error.message}`,
-      };
-      this.addMessageToConversation('assistant', errorMessage.content);
-      this.addMessageToUI(errorMessage, options);
-      return errorMessage;
-    }
-  }
-
-  async _logRetryExhausted(currentRetries, maxRetries) {
-    try {
-      const { isDebugEnabled, createLogger } = await import('../utils/logger.js');
-      if (isDebugEnabled()) {
-        const conversationMessages = this.conversationManager.getMessages();
-        createLogger('AIDiagnostics').error('assistant.empty_response.exhausted', {
-          maxRetries,
-          retryCount: currentRetries,
-          conversationLength: conversationMessages.length,
-          recentMessages: conversationMessages.slice(-5).map(msg => ({
-            role: msg.role,
-            hasToolCalls: !!(msg.tool_calls && msg.tool_calls.length > 0),
-          })),
-        });
-      }
-    } catch {
-      /* intentionally empty */
-    }
-  }
-
-  async _logRetryAttempt(currentRetries) {
-    try {
-      const { isDebugEnabled, createLogger } = await import('../utils/logger.js');
-      if (isDebugEnabled()) {
-        const last =
-          this.conversationManager.messages[this.conversationManager.messages.length - 1];
-        createLogger('AIDiagnostics').info('assistant.empty_response.retry', {
-          attempt: currentRetries,
-          lastRole: last?.role,
-          hasToolCalls: Array.isArray(last?.tool_calls) && last?.tool_calls.length > 0,
-        });
-      }
-    } catch {
-      /* intentionally empty */
     }
   }
 
@@ -516,9 +269,6 @@ class ChatHandler {
     this.conversationManager.addMessage(role, content, toolCalls, toolCallId, metadata);
   }
 
-  /**
-   * Add message to UI only (through callback)
-   */
   /**
    * Add message to UI only (through callback)
    */
