@@ -41,6 +41,12 @@ export class DocumentReadTool extends BaseTool {
           description:
             'The compendium pack ID if reading from a compendium (e.g., "dnd5e.monsters"). Omit to read from the world.',
         },
+        fields: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Optional exact dot-paths to return from the document, e.g. ["system.attributes.ac", "system.attributes.hp"]. Prefer this for targeted factual reads instead of paging through the full document.',
+        },
         startLine: {
           type: 'integer',
           description:
@@ -139,10 +145,30 @@ export class DocumentReadTool extends BaseTool {
 
   _formatDocumentContent(document, id, params) {
     const data = typeof document?.toObject === 'function' ? document.toObject() : document;
-    const json = JSON.stringify(data, null, 2);
+    const selected = this._selectFields(data, params.fields);
+    const json = JSON.stringify(selected, null, 2);
 
     if (!params.startLine && !params.endLine) return json;
     return this._paginateContent(json, params.startLine, params.endLine);
+  }
+
+  _selectFields(data, fields) {
+    if (!Array.isArray(fields) || fields.length === 0) return data;
+
+    const selected = {};
+    for (const path of fields) {
+      if (typeof path !== 'string' || !path.trim()) continue;
+      const value = this._getPath(data, path.trim());
+      if (value !== undefined) selected[path.trim()] = value;
+    }
+    return selected;
+  }
+
+  _getPath(data, path) {
+    return path.split('.').reduce((value, key) => {
+      if (value === null || value === undefined || typeof value !== 'object') return undefined;
+      return value[key];
+    }, data);
   }
 
   _paginateContent(json, startLine, endLine) {
