@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Paused by owner on 2026-09-27 with open runtime gates. C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, and L1–L5 were owner-accepted for implemented code or disposition. H7 live rendering validation, the remaining M10 runtime assessment, the pack read permission candidate, and final runtime acceptance remain open. JS enhancements 1–3 are owner-accepted; JS enhancement 4 is implemented and awaits owner acceptance. Runtime behavior remains unverified.**
+Status: **Paused by owner on 2026-09-27 with open runtime gates. C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, and L1–L5 were owner-accepted for implemented code or disposition. H7 live rendering validation, the remaining M10 runtime assessment, the pack read permission candidate, and final runtime acceptance remain open. JS enhancements 1–4 are owner-accepted; JS enhancement 5 is implemented and awaits owner acceptance. Runtime behavior remains unverified.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -547,12 +547,25 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: regression fixtures exercise world and pack Actors, large unrelated system data, missing images, non-Actor Item artwork, conflicting arguments, and exact source → artwork read with no asset-search capability. Regression 78/78, integration 23/23, security 27/27, component 1/1, and policy passed; syntax and whitespace checks passed.
 - Limits: the model must request the artwork view; JavaScript selects the paths after that choice. This is an Actor-oriented projection over Foundry field data, not proof of every system's art conventions. A missing field does not trigger an autonomous alternative asset search. Real Foundry v14/D&D5e and qwen3:14b behavior remain unmeasured under the paused gates. The static tier needs absent ESLint dependencies.
 - Commit: the commit containing this entry and selected-read change is titled “feat: targeted document artwork view”.
+- Status: **Owner accepted** on 2026-09-27: “Accepted, continue please.” Continuation was scoped to JS enhancement 5. No paused runtime gate was closed.
+
+### JS enhancement 5 — targeted create validation feedback — 2026-09-27
+
+- Authorization: the owner accepted JS enhancement 4 and directed continuation. This authorizes only the next prioritized schema-discovery optimization.
+- Disposition: **Reuse the existing schema validator and remove duplicate dumps**. Unknown top-level create fields now yield the rejected names, a bounded sample of valid top-level fields with `name`, `type`, and `system` first when present, and specific migration hints. The full embedded-schema response and a separate unused formatter were removed. The error envelope retains type and rejected fields without repeating the entire schema. Tool descriptions reserve schema listing and inspection for unknown type/subtype or uncertain field structure; explicit schema requests still work.
+- Evidence: a behavioral regression fixture with 92 top-level fields confirms bounded feedback, no repeated schema object, and no creation side effect. Existing schema reflection tests retain inspection coverage. Regression 79/79, integration 23/23, security 27/27, component 1/1, and policy passed; syntax and whitespace checks passed.
+- Limits: this handles unknown **top-level** fields, not every nested or system-specific Foundry validation failure. Broad schema inspection still returns a full schema when explicitly requested. The impact on qwen3:14b call frequency and real D&D5e validation is unmeasured; H7, M10, pack permission, and final acceptance remain paused. The static tier needs absent ESLint dependencies.
+- Commit: the commit containing this entry and validation response change is titled “fix: target create schema correction”.
 - Status: **Implemented; awaiting owner acceptance**. No other enhancement was authorized.
 
 ### Newly observed candidate — pack read permissions (investigate with separate authorization)
 
 - DocumentAPI.getDocument uses pack.getDocument(id) and returns its object without the module-level permission check used for world reads and pack search. It is uncertain whether Foundry v14 getDocument enforces the user’s pack/document read permission at this boundary. This was observed during M2 but no policy change was authorized or made.
 - Before accepting any security claim for pack reads, test a hidden/restricted pack and a non-GM user in an authorized Foundry environment; if the host does not enforce it, add the smallest permission check at the actual boundary. Track this as a blocked candidate until separately authorized. Do not infer exploitability from source inspection alone.
+
+### Newly observed candidate — create tool examples (separate authorization)
+
+- `DocumentCreateTool.getExamples()` includes an example with `name` outside `data`, while the tool schema requires `data` and creation expects `data.name`. Repository search did not reveal a caller for these examples, so the runtime impact is uncertain. This was observed during JS enhancement 5; its remediation was not authorized under that task. Check actual consumers before replacing or removing examples.
 
 ## Deterministic JavaScript opportunity register (tracking only)
 

@@ -9,7 +9,7 @@ class DocumentSchemaTool extends BaseTool {
   constructor() {
     super(
       'inspect_document_schema',
-      'Retrieve the full field schema for a document type, including required fields, field types, and nested structure. Provide a `subtype` to include game-system-specific fields (e.g., subtype "npc" for Actor shows hit points, challenge rating, etc.). Use this before `create_document` or `update_document` to understand what fields are valid. Use `list_document_schemas` to discover available types and subtypes.',
+      'Retrieve the full field schema when field structure is uncertain or the user asks for it. Provide a `subtype` for game-system-specific fields (e.g., "npc" for Actor). For invalid create fields, first use the targeted correction returned by create_document; use list_document_schemas when the type or subtype is unknown.',
       {
         type: 'object',
         properties: {

@@ -320,6 +320,7 @@ export class SchemaValidator {
     }
 
     const schemaFields = new Set(Object.keys(schemaInfo.fields));
+    result.availableFields = [...schemaFields];
 
     // Common meta-fields that Foundry accepts but may not be in schema.fields
     const metaFields = new Set(['_id', 'type', 'sort', 'ownership', 'flags', '_stats']);
