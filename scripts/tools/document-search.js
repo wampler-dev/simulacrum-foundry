@@ -105,7 +105,8 @@ class DocumentSearchTool extends BaseTool {
       }
 
       if (uuid) {
-        return `- @UUID[${uuid}]{${name}} (${type}, id: ${id})`;
+        const readArgs = JSON.stringify({ documentType: type, documentId: id, ...(doc.pack ? { pack: doc.pack } : {}) });
+        return `- @UUID[${uuid}]{${name}} (${type}, id: ${id}; read_document: ${readArgs})`;
       } else {
         return `- **${name}** (Type: ${type}, id: ${id})`;
       }

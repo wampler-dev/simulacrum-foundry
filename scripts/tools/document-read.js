@@ -28,7 +28,7 @@ export class DocumentReadTool extends BaseTool {
         documentId: {
           type: 'string',
           description:
-            'The ID of the document to read (e.g., "BtDHCHehjqLjmMpV"). Obtain IDs from `list_documents` or `search_documents`.',
+            'The raw document ID or a top-level world/compendium UUID. Search results include ready-to-use read_document arguments. Embedded UUIDs are not supported.',
         },
         includeEmbedded: {
           type: 'boolean',
@@ -71,10 +71,8 @@ export class DocumentReadTool extends BaseTool {
   async execute(parameters) {
     try {
       this.validateParameters(parameters, this.schema);
-      const { documentType, pack } = parameters;
-      // Extract raw ID from UUID references that models may pass
-      // e.g. "@UUID[JournalEntry.BtDHCHehjqLjmMpV]{Sunken Halls}" → "BtDHCHehjqLjmMpV"
-      const documentId = BaseTool.extractRawId(parameters.documentId);
+      const { documentType } = parameters;
+      const { documentId, pack } = this._resolveDocumentIdentity(parameters);
 
       if (!this.isValidDocumentType(documentType) && !pack) {
         return this._createErrorResponse(
@@ -106,6 +104,34 @@ export class DocumentReadTool extends BaseTool {
       const code = isNotFound ? 'DOCUMENT_NOT_FOUND' : 'UNKNOWN_ERROR';
       return this._createErrorResponse(parameters.documentType, code, error.message);
     }
+  }
+
+  _resolveDocumentIdentity({ documentType, documentId, pack }) {
+    const value = documentId.trim();
+    const linked = value.match(/^@UUID\[([^\]]+)\](?:\{[^}]*\})?$/);
+    if (value.startsWith('@UUID[') && !linked) throw new Error('Invalid UUID reference');
+    const uuid = linked ? linked[1] : value;
+    if (!uuid.includes('.')) return { documentId: uuid, pack };
+
+    if (uuid.startsWith('Compendium.')) {
+      const segments = uuid.split('.');
+      if (segments.length !== 4 && segments.length !== 5) {
+        throw new Error('Only top-level compendium document UUIDs are supported');
+      }
+      const uuidPack = segments.slice(1, 3).join('.');
+      const uuidType = segments.length === 5 ? segments[3] : null;
+      const id = segments.at(-1);
+      if (!id || (uuidType && uuidType !== documentType) || (pack && pack !== uuidPack)) {
+        throw new Error('Document UUID does not match the requested type or pack');
+      }
+      return { documentId: id, pack: uuidPack };
+    }
+
+    const segments = uuid.split('.');
+    if (segments.length !== 2 || segments[0] !== documentType || !segments[1] || pack) {
+      throw new Error('Document UUID does not match the requested type or source, or is embedded');
+    }
+    return { documentId: segments[1] };
   }
 
   async _fetchDocument(type, id, options = {}) {

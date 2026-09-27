@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, H2, and H3 owner-accepted. H7 live validation is pending by owner direction. H4 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, H2, H3, and H4 owner-accepted. H7 live validation is pending by owner direction. M3 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -339,4 +339,27 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: tests/regression/read-source-identity.test.mjs exercises world and two packs with identical raw ID and data, cross-source denial for update and delete, stale detection per source, and source-specific deletion. The prior H3 test was updated to register the pack read explicitly. Regression 38/38 plus compaction budget, integration 14/14, security 19/19, and policy passed; git whitespace check passed.
 - Limits: local mocks validate routing and prerequisites, not live Foundry v14 permission or pack mutation. M2 remains responsible for whether a paginated read gives sufficient evidence to count as a read; H7 live browser validation remains pending.
 - Commit: the commit containing this entry and H4 code is titled “fix: scope read prerequisites to document source (H4)”.
+- Status: **Owner accepted** on 2026-09-27: “I accept. As you continue...” The permission to continue was scoped to M3. H7 remains pending.
+
+### M3 implementation — 2026-09-27
+
+- Authorization: the owner accepted H4 and directed continuation, and requested tracking (documentation only) of appropriate JavaScript preprocessing opportunities. This authorizes M3 implementation and the opportunity register below, not implementation of additional candidates.
+- Disposition: **Small fix to existing handoff**. Search results now include explicit read_document arguments containing the raw ID, document type, and pack when applicable. Read accepts those arguments or a linked/bare top-level world or compendium UUID, derives the pack and raw ID, and rejects mismatched source/type or embedded UUIDs before fetching. Bare raw IDs with explicit pack continue to work. No reference index or new routing layer was added.
+- Evidence: tests/regression/search-read-identity.test.mjs passes world and pack search arguments directly to read with identical IDs, checks bare/linked compendium UUIDs, and confirms mismatch/embedded rejection before DocumentAPI.getDocument. Regression 40/40 plus compaction budget, integration 14/14, security 19/19, and policy passed.
+- Limits: UUID parsing supports top-level world references and the standard two-component pack ID forms observed in search results; embedded references require a separate explicit contract. Search semantics and result limits remain M1; read context sizing remains M2. The mock tests do not establish live Foundry v14 UUID coverage or permission behavior.
+- Commit: the commit containing this entry and M3 code is titled “fix: hand search identities directly to read (M3)”.
 - Status: **Awaiting owner acceptance**. No other finding was closed.
+
+## Deterministic JavaScript opportunity register (tracking only)
+
+The owner asked that potential server-side or Foundry-browser JavaScript preprocessing be recorded as work proceeds. These are candidates under existing findings, not separate authorization or design decisions. Prefer existing Foundry APIs and existing module code; require behavior and context measurements before adding custom layers.
+
+| Existing finding | Mechanical work to evaluate | Model burden avoided | Boundary / evidence needed |
+| --- | --- | --- | --- |
+| M1, M2 | Bound search results and select only requested document fields in DocumentAPI/tool code. | Scanning irrelevant matches or long JSON to locate a few fields. | Honor permissions, source and schema; measure result sizes and pagination. |
+| M3, H4 | Produce and consume source-qualified document identity in search/read/mutation code. | Parsing UUID display syntax and remembering pack identity. | M3 handoff implemented for top-level reads; mutation identity and embedded references remain explicit future checks. |
+| M4, M8 | Reuse mutation readback and normalize result/error envelopes mechanically. | Inferring success from prose or nested output. | Verify actual Foundry result and partial side effects; do not claim verification after exceptions. |
+| H6, M11 | Derive the offered tools from a dispatcher-enforced capability set per turn. | Selecting among unrelated administration, mutation, schema, or executable tools. | Continue the same allowed set through retries and loop turns. |
+| M5, M6 | End and retry turns from explicit execution state. | Guessing whether described actions were executed or whether another tool round is needed. | Preserve truthful visible output and bounded recovery. |
+| M7, H5 | Limit retained tool output and compact the actual outbound history. | Re-reading huge prior results and summaries. | Measure transport tokens, persisted flags, UI output, and continuation. |
+| M9 | Use actual returned document IDs and explicit partial-state markers for copy/move. | Parsing prose to identify a new target or deciding if a move completed. | Avoid duplicate mutations on retry; preserve approved source and destination. |
