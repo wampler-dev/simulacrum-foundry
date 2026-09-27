@@ -29,6 +29,25 @@ test('explicit tasks grant only relevant capabilities; read-only instruction pre
   assert.equal(getTurnToolNames(turn('What does this JavaScript do?')).has('run_javascript'), false);
 });
 
+test('common read requests offer only the tools needed for their path', () => {
+  assert.deepEqual([...getTurnToolNames(turn('Hello!'))], []);
+  assert.deepEqual([...getTurnToolNames(turn('Thanks for your help.'))], []);
+  const named = getTurnToolNames(turn('Find the Goblin Warrior from the Monster Manual'));
+  assert.equal(named.has('search_documents'), true);
+  assert.equal(named.has('read_document'), true);
+  assert.equal(named.has('read_tool_output'), true, 'large results can require paging in the same turn');
+  assert.equal(named.has('end_loop'), true, 'loop completion remains available');
+  assert.equal(named.has('list_documents'), false);
+  assert.equal(named.has('search_assets'), false);
+  assert.equal(getTurnToolNames(turn('List all Actor documents')).has('list_documents'), true);
+  assert.equal(getTurnToolNames(turn('List all spells')).has('list_documents'), true);
+  assert.equal(getTurnToolNames(turn('Which compendium packs are available?')).has('list_documents'), true);
+  assert.equal(getTurnToolNames(turn('What portrait and token does it already use?')).has('search_assets'), false);
+  assert.equal(getTurnToolNames(turn('Find alternative artwork for this actor')).has('search_assets'), true);
+  assert.equal(getTurnToolNames(turn('Find different artwork from what it already uses')).has('search_assets'), true);
+  assert.equal(getTurnToolNames(turn('Read only: list all actors')).has('list_documents'), true);
+});
+
 test('dispatcher rejects an unadvertised native or inline call without executing it', async t => {
   let executions = 0;
   t.mock.method(toolRegistry, 'executeTool', async () => { executions++; return { result: { success: true } }; });

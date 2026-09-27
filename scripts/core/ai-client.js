@@ -368,7 +368,7 @@ export class AIClient {
       }),
     };
 
-    if (tools) {
+    if (Array.isArray(tools) && tools.length > 0) {
       body.tools = tools;
       body.tool_choice = 'auto';
     }

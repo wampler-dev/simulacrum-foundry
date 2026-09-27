@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Paused by owner on 2026-09-27 with open runtime gates. C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, and L1–L5 were owner-accepted for implemented code or disposition. H7 live rendering validation, the remaining M10 runtime assessment, the pack read permission candidate, and final runtime acceptance remain open. A separately authorized exact-reference search enhancement is implemented and awaits owner acceptance; its runtime behavior is unverified.**
+Status: **Paused by owner on 2026-09-27 with open runtime gates. C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, and L1–L5 were owner-accepted for implemented code or disposition. H7 live rendering validation, the remaining M10 runtime assessment, the pack read permission candidate, and final runtime acceptance remain open. JS enhancement 1 is owner-accepted; JS enhancement 2 is implemented and awaits owner acceptance. Runtime behavior for both remains unverified.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -520,7 +520,16 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: regression tests cover world/pack duplicate names, exact title selection, title collision, inaccessible and unknown sources, no match, source mismatch, and source-qualified search-to-selected-field-read handoff. Regression 72/72, integration 23/23, security 26/26, component 1/1, and policy passed; syntax and whitespace checks passed.
 - Limits: the model must still supply the name and source as tool arguments; this does not parse arbitrary natural-language source phrases or automatically read the document. Two candidates establish ambiguity but do not enumerate every duplicate. The static tier cannot run in this checkout without installed ESLint dependencies. Real Foundry v14/D&D5e metadata, pack permission behavior, and qwen3:14b tool use remain unverified under the paused runtime gates.
 - Commit: the commit containing this entry and search change is titled “feat: exact source-qualified document search”.
-- Status: **Implemented; awaiting owner acceptance**. No paused runtime gate is closed.
+- Status: **Owner accepted** on 2026-09-27: “I accept. Continue.” Continuation was scoped to JS enhancement 2. No paused runtime gate was closed.
+
+### JS enhancement 2 — smaller turn capability surface — 2026-09-27
+
+- Authorization: the owner accepted JS enhancement 1 and directed continuation. This authorizes only the next prioritized selector optimization.
+- Disposition: **Adjust the existing selector and transport**. Obvious standalone greetings and thanks offer no tools. Named document reads retain search, read, output paging, and loop completion but do not offer browsing. Listing/inventory requests offer `list_documents`. A request for artwork the document already uses does not offer asset search, while a request for alternative artwork does. The turn's allowed set remains fixed and enforced by the dispatcher. The AI client omits `tools` and `tool_choice` from a truly empty native-tool request.
+- Evidence: security tests exercise direct, named, browsing, existing-artwork, alternative-artwork, read-only, and action requests; a regression test inspects the outbound no-tool provider body. Existing continuation and dispatcher tests cover the fixed allowed set. Regression 73/73, integration 23/23, security 27/27, component 1/1, and policy passed; syntax and whitespace checks passed.
+- Limits: these intentionally small text rules are not a general natural-language intent parser. The asset search tool remains available on many artwork requests because this static selector cannot know whether the selected document has an image before reading it. No real qwen3:14b tool-choice, latency, or Foundry acceptance measurement occurred; the paused gates remain open. The static tier needs absent local ESLint dependencies.
+- Commit: the commit containing this entry and selector change is titled “fix: trim routine turn tool exposure”.
+- Status: **Implemented; awaiting owner acceptance**. No other enhancement was authorized.
 
 ### Newly observed candidate — pack read permissions (investigate with separate authorization)
 
