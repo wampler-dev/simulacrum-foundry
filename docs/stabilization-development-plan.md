@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Paused by owner on 2026-09-27 with open runtime gates. C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, and L1–L5 were owner-accepted for implemented code or disposition. H7 live rendering validation, the remaining M10 runtime assessment, the pack read permission candidate, and final runtime acceptance remain open. JS enhancement 1 is owner-accepted; JS enhancement 2 is implemented and awaits owner acceptance. Runtime behavior for both remains unverified.**
+Status: **Paused by owner on 2026-09-27 with open runtime gates. C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, and L1–L5 were owner-accepted for implemented code or disposition. H7 live rendering validation, the remaining M10 runtime assessment, the pack read permission candidate, and final runtime acceptance remain open. JS enhancements 1–2 are owner-accepted; JS enhancement 3 is implemented and awaits owner acceptance. Runtime behavior remains unverified.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -529,6 +529,15 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: security tests exercise direct, named, browsing, existing-artwork, alternative-artwork, read-only, and action requests; a regression test inspects the outbound no-tool provider body. Existing continuation and dispatcher tests cover the fixed allowed set. Regression 73/73, integration 23/23, security 27/27, component 1/1, and policy passed; syntax and whitespace checks passed.
 - Limits: these intentionally small text rules are not a general natural-language intent parser. The asset search tool remains available on many artwork requests because this static selector cannot know whether the selected document has an image before reading it. No real qwen3:14b tool-choice, latency, or Foundry acceptance measurement occurred; the paused gates remain open. The static tier needs absent local ESLint dependencies.
 - Commit: the commit containing this entry and selector change is titled “fix: trim routine turn tool exposure”.
+- Status: **Owner accepted** on 2026-09-27: “Accept, continue.” Continuation was scoped to JS enhancement 3. No paused runtime gate was closed.
+
+### JS enhancement 3 — structured search handoff — 2026-09-27
+
+- Authorization: the owner accepted JS enhancement 2 and directed continuation. This authorizes only the next prioritized search-output optimization.
+- Disposition: **Consolidate model-facing search output**. Existing broad and exact search results now share one compact JSON envelope with `status`, conservative `limitReached`, guidance, and candidate records. Each candidate has a source (`world` or pack ID), optional readable pack title and Foundry-provided UUID, and exact `read_document` arguments. An incomplete hit fails explicitly instead of fabricating an ID or UUID. Exact results retain unique/ambiguous/no-match semantics and never promote an index match into document facts. The user-facing short summary stays separate.
+- Evidence: regression tests inspect bounded broad results, duplicate-source ambiguity, pack-title selection, no match, malformed identity failure, and JSON candidate arguments consumed by a selected-field read. Regression 74/74, integration 23/23, security 27/27, component 1/1, and policy passed; syntax and whitespace checks passed. The static tier remains unavailable without local ESLint dependencies.
+- Limits: the broad result limit is a cap, not a count of all matches; reaching it cannot prove additional matches exist. Search order remains Foundry world/type/pack traversal order, and the model still chooses a candidate for broad ambiguous results. No token reduction, qwen3:14b tool behavior, or live Foundry v14 behavior was measured. H7, M10, pack permission, and final acceptance gates remain paused.
+- Commit: the commit containing this entry and result contract is titled “refactor: structure document search handoff”.
 - Status: **Implemented; awaiting owner acceptance**. No other enhancement was authorized.
 
 ### Newly observed candidate — pack read permissions (investigate with separate authorization)

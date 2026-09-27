@@ -44,7 +44,13 @@ test('default name search bounds combined world and pack results and reports lim
   const message = await tool.execute({ query: 'goblin', maxResults: 3 });
   assert.match(message.display, /Showing up to 3/);
   assert.match(message.display, /narrow the search/);
-  assert.equal((message.content.match(/read_document:/g) || []).length, 3);
+  const output = JSON.parse(message.content);
+  assert.equal(output.status, 'results');
+  assert.equal(output.limitReached, true);
+  assert.equal(output.candidates.length, 3);
+  assert.deepEqual(output.candidates.map(candidate => candidate.source), ['world', 'world', 'world.one']);
+  assert.deepEqual(output.candidates[2].read_document, { documentType: 'Actor', documentId: 'same', pack: 'world.one' });
+  assert.equal(Object.hasOwn(output.candidates[2], 'uuid'), false, 'do not invent a UUID absent from the index');
 });
 
 test('explicit fields, pack selection, and type filter agree with index behavior', async t => {
@@ -84,27 +90,30 @@ test('exact names resolve a readable source without treating the index as docume
   const { requests } = setup(t);
   const tool = new DocumentSearchTool();
   const ambiguous = await tool.execute({ query: 'Goblin', exact: true });
-  assert.match(ambiguous.content, /Ambiguous exact name/);
-  assert.equal((ambiguous.content.match(/read_document:/g) || []).length, 2);
+  assert.equal(JSON.parse(ambiguous.content).status, 'ambiguous');
+  assert.equal(JSON.parse(ambiguous.content).candidates.length, 2);
   assert.doesNotMatch(ambiguous.content, /Goblin Veteran|Goblin Shaman/);
   assert.equal(requests.length, 1, 'stop as soon as a second exact candidate proves ambiguity');
 
   const selected = await tool.execute({ query: 'gObLiN', exact: true, source: 'monster manual' });
-  assert.match(selected.content, /One exact match/);
+  assert.equal(JSON.parse(selected.content).status, 'unique');
   assert.match(selected.content, /identity only.*read_document/);
-  assert.match(selected.content, /"pack":"world.one"/);
+  assert.equal(JSON.parse(selected.content).candidates[0].sourceTitle, 'Monster Manual');
+  assert.equal(JSON.parse(selected.content).candidates[0].read_document.pack, 'world.one');
   assert.doesNotMatch(selected.content, /note|fire|ice/);
-  assert.equal((selected.content.match(/read_document:/g) || []).length, 1);
-  assert.match((await tool.execute({ query: 'Goblin', exact: true, source: 'world.one' })).content, /One exact match/);
+  assert.equal(JSON.parse(selected.content).candidates.length, 1);
+  assert.equal(JSON.parse((await tool.execute({ query: 'Goblin', exact: true, source: 'world.one' })).content).status, 'unique');
 
   const world = await tool.execute({ query: 'Goblin', exact: true, source: 'world' });
-  assert.match(world.content, /One exact match/);
-  assert.doesNotMatch(world.content, /"pack":/);
+  assert.equal(JSON.parse(world.content).status, 'unique');
+  assert.equal(JSON.parse(world.content).candidates[0].source, 'world');
+  assert.equal(Object.hasOwn(JSON.parse(world.content).candidates[0].read_document, 'pack'), false);
   const missing = await tool.execute({ query: 'Goblin', exact: true, source: 'Unknown Manual' });
   assert.equal(missing.error.type, 'SEARCH_FAILED');
   const notFound = await tool.execute({ query: 'Missing', exact: true, source: 'world.one' });
-  assert.match(notFound.content, /No exact match/);
-  assert.match((await tool.execute({ query: 'Gob', exact: true })).content, /No exact match/);
+  assert.equal(JSON.parse(notFound.content).status, 'no_match');
+  assert.equal(JSON.parse(notFound.content).candidates.length, 0);
+  assert.equal(JSON.parse((await tool.execute({ query: 'Gob', exact: true })).content).status, 'no_match');
 });
 
 test('same-title and hidden sources cannot be silently selected', async t => {
@@ -114,7 +123,16 @@ test('same-title and hidden sources cannot be silently selected', async t => {
   assert.match((await tool.execute({ query: 'Goblin', exact: true, source: 'Monster Manual' })).error.message, /ambiguous/);
   game.packs[1].testUserPermission = () => false;
   assert.match((await tool.execute({ query: 'Goblin', exact: true, source: 'world.two' })).error.message, /No readable pack/);
-  assert.match((await tool.execute({ query: 'Goblin', exact: true, source: 'Monster Manual' })).content, /One exact match/);
+  assert.equal(JSON.parse((await tool.execute({ query: 'Goblin', exact: true, source: 'Monster Manual' })).content).status, 'unique');
   assert.match((await tool.execute({ query: 'Goblin', exact: true, source: 'world', pack: 'world.one' })).error.message, /either source or pack/);
   assert.match((await tool.execute({ query: 'Goblin', exact: true, fields: ['note'] })).error.message, /limited to the document name/);
+});
+
+test('malformed search hits cannot advertise fabricated read arguments', async t => {
+  setup(t);
+  t.mock.method(DocumentAPI, 'searchDocuments', async () => [{ type: 'Actor', name: 'Nameless ID' }]);
+  const outcome = await new DocumentSearchTool().execute({ query: 'Nameless ID' });
+  assert.equal(outcome.error.type, 'SEARCH_FAILED');
+  assert.match(outcome.error.message, /usable document type or ID/);
+  assert.doesNotMatch(outcome.content, /read_document/);
 });

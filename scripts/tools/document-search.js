@@ -84,14 +84,23 @@ class DocumentSearchTool extends BaseTool {
           : resultCount > 1 ? 'Specify a source or ask the user to choose; do not select a candidate arbitrarily.'
             : 'Check the name or source; do not treat a partial name as an exact match.';
         return {
-          content: `${status} for "${params.query}". ${guidance}\n${this.formatSearchResults(results, params.query)}`,
+          content: this.formatSearchResults(results, params.query, {
+            status: resultCount === 0 ? 'no_match' : resultCount === 1 ? 'unique' : 'ambiguous',
+            guidance,
+          }),
           display: `${status}. ${guidance}`,
         };
       }
       const maxResults = params.maxResults ?? 50;
       const summary = `${resultCount >= maxResults ? 'Showing up to' : 'Found'} ${resultCount} document${resultCount !== 1 ? 's' : ''} matching "${params.query}"${resultCount >= maxResults ? '; narrow the search for more' : ''}`;
       return {
-        content: this.formatSearchResults(results, params.query),
+        content: this.formatSearchResults(results, params.query, {
+          status: resultCount === 0 ? 'no_match' : 'results',
+          limitReached: resultCount >= maxResults,
+          guidance: resultCount >= maxResults
+            ? 'Result limit reached; additional matches are unknown. Narrow the query or source.'
+            : 'Read a selected document for its facts; search results contain identity only.',
+        }),
         display: `<p><strong>${summary}</strong></p>`,
       };
     } catch (error) {
@@ -104,44 +113,33 @@ class DocumentSearchTool extends BaseTool {
   }
 
   /**
-   * Format search results for display
+   * Format source-qualified matches for the model without duplicating prose and links.
    * @param {Array} results - Search results
    * @param {string} query - Search query
    * @returns {string} Formatted results
    */
-  formatSearchResults(results, query) {
-    if (results.length === 0) {
-      return 'No documents found matching "' + query + '"';
-    }
-
-    const formattedResults = results.map(doc => {
-      const name = doc.name || doc.title || doc._id || 'Untitled';
-      const id = doc.id || doc._id || 'Unknown ID';
-      const type = doc.type || 'Unknown';
-      let uuid = doc.uuid;
-
-      // Construct UUID if missing
-      if (!uuid) {
-        if (doc.pack) {
-          uuid = `Compendium.${doc.pack}.${id}`;
-        } else {
-          const docType = doc.documentName || doc.constructor?.documentName || type;
-          // Basic heuristic if documentName isn't available on the result object
-          if (docType) {
-            uuid = `${docType}.${id}`;
-          }
+  formatSearchResults(results, query, { status, guidance, limitReached = false }) {
+    return JSON.stringify({
+      query, status, limitReached, guidance,
+      candidates: results.map(doc => {
+        const id = doc.id || doc._id;
+        if (typeof doc.type !== 'string' || typeof id !== 'string' || !id) {
+          throw new Error('Search result lacks a usable document type or ID');
         }
-      }
-
-      if (uuid) {
-        const readArgs = JSON.stringify({ documentType: type, documentId: id, ...(doc.pack ? { pack: doc.pack } : {}) });
-        return `- @UUID[${uuid}]{${name}} (${type}, id: ${id}; read_document: ${readArgs})`;
-      } else {
-        return `- **${name}** (Type: ${type}, id: ${id})`;
-      }
+        const sourceTitle = doc.pack && game?.packs?.get?.(doc.pack)?.metadata?.title;
+        return {
+          name: doc.name || doc.title || doc._id || 'Untitled',
+          source: doc.pack || 'world',
+          ...(sourceTitle ? { sourceTitle } : {}),
+          ...(doc.uuid ? { uuid: doc.uuid } : {}),
+          read_document: {
+            documentType: doc.type,
+            documentId: id,
+            ...(doc.pack ? { pack: doc.pack } : {}),
+          },
+        };
+      }),
     });
-
-    return '**Search Results for "' + query + '"**\n' + formattedResults.join('\n');
   }
 }
 

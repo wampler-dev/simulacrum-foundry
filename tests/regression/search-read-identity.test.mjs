@@ -27,7 +27,7 @@ test('search hands world and pack result arguments directly to read', async t =>
     return { _id: args[1], name: 'Hero' };
   });
   const content = (await new DocumentSearchTool().execute({ query: 'Hero' })).content;
-  const handoffs = [...content.matchAll(/read_document: (\{[^}]+\})/g)].map(match => JSON.parse(match[1]));
+  const handoffs = JSON.parse(content).candidates.map(candidate => candidate.read_document);
   assert.deepEqual(handoffs, [
     { documentType: 'Actor', documentId: 'shared' },
     { documentType: 'Actor', documentId: 'shared', pack: 'world.heroes' },
@@ -90,9 +90,9 @@ test('exact source title hands one selected identity to a field read', async t =
     documentReadRegistry.clear();
   });
   const selected = await new DocumentSearchTool().execute({ query: 'Goblin Warrior', exact: true, source: 'Monster Manual' });
-  assert.match(selected.content, /One exact match/);
+  assert.equal(JSON.parse(selected.content).status, 'unique');
   assert.doesNotMatch(selected.content, /system|hp/);
-  const args = JSON.parse(selected.content.match(/read_document: (\{[^}]+\})/)[1]);
+  const args = JSON.parse(selected.content).candidates[0].read_document;
   assert.deepEqual(args, { documentType: 'Actor', documentId: 'selected', pack: 'dnd5e.monsters' });
   t.mock.method(DocumentAPI, 'getDocument', async (_type, id, options) => {
     assert.equal(id, 'selected');
