@@ -25,6 +25,7 @@ import {
 import { emitProcessStatus, emitRetryStatus, SimulacrumHooks } from './hook-manager.js';
 import { interactionLogger } from './interaction-logger.js';
 import { executeToolCalls, storeToolJustification } from './tool-execution.js';
+import { toolFailureMessage } from './turn-failure.js';
 // Re-export for existing importers (chat-handler); the store lives in tool-execution.js.
 export { retrieveToolJustification } from './tool-execution.js';
 
@@ -107,11 +108,24 @@ async function _runLoopIteration(context) {
 
     if (context.signal?.aborted) throw new Error('Process was cancelled');
 
+    // Never display unverified success prose after a failed tool result.
+    if ((context.lastToolFailed || (context.requestedActions?.size && !context.actionCompleted)) &&
+        !currentResponse._parseError &&
+        !isToolCallFailure(currentResponse) &&
+        (!Array.isArray(currentResponse.toolCalls) || currentResponse.toolCalls.length === 0) &&
+        currentResponse.content?.trim()) {
+      currentResponse = toolFailureMessage(context.lastToolFailed ? 'tool_execution_failure' : 'action_not_executed');
+    }
+
     // Extract response from tool calls (primary) or use content (fallback)
     // The response parameter is the canonical way for AI to communicate with users
     const toolResponse = _extractToolResponse(currentResponse.toolCalls);
     if (toolResponse) {
       currentResponse.content = toolResponse;
+    }
+    if (currentResponse.toolCalls?.every(call => (call.function?.name || call.name) === 'end_loop') &&
+        (context.lastToolFailed || (context.requestedActions?.size && !context.actionCompleted))) {
+      currentResponse.content = toolFailureMessage(context.lastToolFailed ? 'tool_execution_failure' : 'action_not_executed').content;
     }
 
     // Notify UI of the message content FIRST so pending cards have a message to attach to
@@ -219,8 +233,7 @@ async function _processLoopCycle(currentResponse, context, state) {
   if (isToolCallFailure(currentResponse)) {
     toolFailureAttempts++;
     if (toolFailureAttempts >= MAX_TOOL_FAILURE_ATTEMPTS) {
-      const value = await _runToolFailureFallback(context);
-      return { action: 'return', value, reason: 'tool_failure_fallback' };
+      return { action: 'return', value: toolFailureMessage('tool_call_failure'), reason: 'tool_call_failure' };
     }
     const response = await _handleToolRefusal(currentResponse, context, toolFailureAttempts);
     return { action: 'continue', response, repeatCount, toolFailureAttempts };
@@ -229,6 +242,12 @@ async function _processLoopCycle(currentResponse, context, state) {
   // 3. A substantive assistant answer completes the turn, with or without prior tools.
   if (!Array.isArray(currentResponse.toolCalls) || currentResponse.toolCalls.length === 0) {
     if (currentResponse.content && currentResponse.content.trim().length > 0) {
+      if (context.lastToolFailed || currentResponse._terminalReason === 'action_not_executed') {
+        context.conversationManager.addMessage('assistant', currentResponse.content);
+        await context.conversationManager.save();
+        _finishTaskTracker();
+        return { action: 'return', value: currentResponse, reason: currentResponse._terminalReason };
+      }
       context.conversationManager.addMessage('assistant', currentResponse.content);
       await context.conversationManager.save();
       _finishTaskTracker();
@@ -307,6 +326,11 @@ async function _processLoopCycle(currentResponse, context, state) {
     successful: toolResults.filter(r => r.success).length,
     toolNames: toolResults.map(r => r.toolName),
   });
+  const precedingToolFailed = context.lastToolFailed;
+  context.lastToolFailed = toolResults.some(result => !result.success);
+  if (toolResults.some(result => result.success && context.requestedActions?.has(result.toolName))) {
+    context.actionCompleted = true;
+  }
 
   // 5. Handle Execution Failures
   if (toolResults.some(r => !r.success)) {
@@ -324,6 +348,12 @@ async function _processLoopCycle(currentResponse, context, state) {
     // Auto-close task tracker if manage_task has an active task
     _finishTaskTracker();
 
+    if (precedingToolFailed || (context.requestedActions?.size && !context.actionCompleted)) {
+      const reason = precedingToolFailed ? 'tool_execution_failure' : 'action_not_executed';
+      const value = toolFailureMessage(reason);
+      value._emitted = currentResponse._emitted;
+      return { action: 'return', value, reason };
+    }
     return { action: 'break', reason: 'end_loop' };
   }
 
@@ -332,33 +362,18 @@ async function _processLoopCycle(currentResponse, context, state) {
     _notifyLegacyToolResults(toolResults, context);
   }
 
-  // 7. Get Next Response (with retry on transient API errors)
+  // 7. The AI client owns transport retries; do not multiply attempts here.
   interactionLogger.logLoopEvent(context.loopId, 'continuation_requested', {
     reason: 'after_tool_results',
     toolResults: toolResults.length,
   });
-  for (let apiAttempt = 0; apiAttempt < MAX_TOOL_FAILURE_ATTEMPTS; apiAttempt++) {
-    try {
-      const response = await _getNextAIResponse(toolResults, context);
-      return { action: 'continue', response, repeatCount, toolFailureAttempts };
-    } catch (error) {
-      logger.error(
-        `API Error during loop cycle (attempt ${apiAttempt + 1}/${MAX_TOOL_FAILURE_ATTEMPTS}):`,
-        error
-      );
-      // Cancellation and request timeouts are terminal: a wedged endpoint is
-      // not fixed by backoff, so no retry sleep and no fallback request.
-      const loopError = _classifyLoopError(error);
-      if (loopError === 'cancelled' || loopError === 'request_timeout') {
-        throw error;
-      }
-      if (apiAttempt + 1 >= MAX_TOOL_FAILURE_ATTEMPTS) {
-        const value = await _runToolFailureFallback(context);
-        return { action: 'return', value, reason: 'tool_failure_fallback' };
-      }
-      const delayMs = getRetryDelayMs(apiAttempt);
-      await delayWithSignal(delayMs, context.signal);
-    }
+  try {
+    const response = await _getNextAIResponse(toolResults, context);
+    return { action: 'continue', response, repeatCount, toolFailureAttempts };
+  } catch (error) {
+    if (_classifyLoopError(error) === 'cancelled' || _classifyLoopError(error) === 'request_timeout') throw error;
+    logger.error('AI continuation failed after provider retries:', error);
+    return { action: 'return', value: toolFailureMessage('provider_failure'), reason: 'provider_failure' };
   }
 }
 
@@ -667,42 +682,6 @@ function _logToolFailures(toolResults, retryCount, limit) {
       failedCount: toolResults.filter(r => !r.success).length,
     });
   }
-}
-
-async function _runToolFailureFallback(context) {
-  const instruction = 'Tool calls are temporarily disabled. Provide a plain language response.';
-  const msgs = _getConversationMessages(context);
-  const last = msgs[msgs.length - 1];
-  if (last?.content !== instruction) {
-    context.conversationManager.addMessage('system', instruction);
-  }
-  const systemPrompt = await context.getSystemPrompt();
-  interactionLogger.logLoopEvent(context.loopId, 'api_request_started', {
-    mode: 'tool_failure_fallback',
-  });
-  const startedAt = Date.now();
-  let raw;
-  try {
-    raw = await context.aiClient.chatWithSystem(msgs, () => systemPrompt, null, {
-      signal: context.signal,
-    });
-  } catch (error) {
-    if (_classifyLoopError(error) === 'cancelled') {
-      interactionLogger.logLoopEvent(context.loopId, 'api_request_aborted');
-    } else {
-      interactionLogger.logLoopEvent(context.loopId, 'api_request_failed', {
-        error: error.message,
-      });
-    }
-    throw error;
-  }
-  interactionLogger.logLoopEvent(context.loopId, 'api_request_finished', {
-    ms: Date.now() - startedAt,
-  });
-  const fallback = normalizeAIResponse(raw);
-  const text =
-    (fallback.content || '') + '\n\nNote: Tool functionality was temporarily unavailable.';
-  return { ...fallback, content: text, display: text, toolCalls: [] };
 }
 
 function _handleRepeatLimit(context, response, count, limit) {

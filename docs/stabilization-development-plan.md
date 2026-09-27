@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M7, M8, and M9 owner-accepted for implemented code. H7 live validation is pending by owner direction. M5 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M7, M8, and M9 owner-accepted for implemented code. H7 live validation is pending by owner direction. M6 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -429,6 +429,15 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: integration tests drive a tool call through a text-only continuation and assert one provider continuation, one visible answer, one persisted answer, no corrective churn, and `assistant_response` terminal logging; a separate test covers empty continuation correction. A direct no-tool engine answer is tested. Regression 59/59, integration 16/16, security 24/24, component 1/1, policy and whitespace checks passed.
 - Limits: this accepts text as a final answer, even when the model merely describes an action it never called; R6 and M6 still own truthful recovery for narrated-but-unexecuted actions and failures. A live Ollama/Foundry UI session and persistence reload remain unverified. H7 remains pending.
 - Commit: the commit containing this entry and M5 code is titled “fix: complete tool turns on assistant answers (M5)”.
+- Status: **Owner accepted** on 2026-09-27: “Accepted, please continue.” Continuation was scoped to M6.
+
+### M6 implementation — 2026-09-27
+
+- Authorization: the owner accepted M5 and directed continuation. This authorizes M6 only.
+- Disposition: **Remove tool-free model fallback after failed tool/provider calls**. Initial tool-call parsing failures remain limited to three engine attempts; exhaustion produces a deterministic terminal failure rather than another model completion. The AI client owns transport retries, so the loop makes one continuation call and reports a deterministic provider failure after those retries. Cancellation and request timeouts remain terminal. Tool denial/failure is recorded; a subsequent successful tool action may recover. If the latest action failed, or an explicit mutation/code request has no successful matching tool call, the model's claimed completion is replaced before UI display/history with a truthful terminal status. `end_loop` cannot convert such an unresolved failure into success. No new planning/router framework was added.
+- Evidence: tests/integration/local/tool-loop-continuation.test.mjs covers provider exhaustion, cancellation, denied tool followed by claimed success, read-only tool followed by claimed mutation, recovery through successful retry, and bounded iteration. tests/security/turn-capabilities.test.mjs covers action without a tool call and initial tool-call failure exhaustion without fallback. Regression 59/59, integration 19/19, security 26/26, component 1/1, and policy passed; git whitespace check passed.
+- Limits: the turn capability classifier from H6 defines which requests count as explicit actions; uncommon wording can be under- or overselected. Successful tool result does not prove that all requested multi-step work was completed, and partial side effects still require inspecting tool results. Provider retry policy inside AIClient still allows up to six transport attempts; operational loop limits are L4. No live Foundry/Ollama execution or browser UI/reload check occurred. H7 remains pending.
+- Commit: the commit containing this entry and M6 code is titled “fix: make tool failure and completion truthful (M6)”.
 - Status: **Awaiting owner acceptance**. No other finding was closed.
 
 ### Newly observed candidate — pack read permissions (investigate with separate authorization)

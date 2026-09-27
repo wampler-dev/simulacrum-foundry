@@ -79,3 +79,36 @@ test('engine accepts a direct answer without starting the tool loop', async t =>
   assert.equal(result.content, 'Hello!');
   assert.deepEqual(emitted.map(message => message.content), ['Hello!']);
 });
+
+test('an action request with no action call cannot report completion', async t => {
+  const history = turn('Create an actor named Bob');
+  const messages = [];
+  const emitted = [];
+  t.mock.method(toolRegistry, 'getToolSchemas', () => []);
+  t.mock.method(SimulacrumCore, 'generateResponse', async () => ({ role: 'assistant', content: 'I created Bob.', toolCalls: [] }));
+  const result = await new ConversationEngine({ getMessages: () => history, addMessage: (...args) => messages.push(args) })
+    .processTurn({ onAssistantMessage: message => emitted.push(message) });
+  assert.equal(result._terminalReason, 'action_not_executed');
+  assert.equal(emitted.length, 1);
+  assert.doesNotMatch(emitted[0].content, /created Bob/);
+  assert.deepEqual(messages.map(args => args[1]), [result.content]);
+});
+
+test('exhausted initial tool-call failures do not trigger a prose fallback', async t => {
+  const history = turn('Find an actor');
+  const messages = [];
+  const emitted = [];
+  let calls = 0;
+  t.mock.method(toolRegistry, 'getToolSchemas', () => []);
+  t.mock.method(SimulacrumCore, 'generateResponse', async () => {
+    calls++;
+    return { errorCode: 'TOOL_CALL_FAILURE', content: 'I found the actor.', toolCalls: [] };
+  });
+  const result = await new ConversationEngine({ getMessages: () => history, addMessage: (...args) => messages.push(args) })
+    .processTurn({ onAssistantMessage: message => emitted.push(message) });
+  assert.equal(calls, 3);
+  assert.equal(result._terminalReason, 'tool_call_failure');
+  assert.doesNotMatch(result.content, /found the actor/);
+  assert.equal(emitted.length, 1);
+  assert.equal(messages.filter(args => args[0] === 'system').length, 0);
+});

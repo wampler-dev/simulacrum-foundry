@@ -8,7 +8,8 @@
 import { SimulacrumCore } from './simulacrum-core.js';
 import { processToolCallLoop } from './tool-loop-handler.js';
 import { toolRegistry } from './tool-registry.js';
-import { getTurnToolSchemas } from './turn-capabilities.js';
+import { ACTION_TOOL_NAMES, getTurnToolSchemas } from './turn-capabilities.js';
+import { toolFailureMessage } from './turn-failure.js';
 import { appendEmptyContentCorrection, appendToolFailureCorrection } from './correction.js';
 import {
   isToolCallFailure,
@@ -20,7 +21,6 @@ import {
 } from '../utils/retry-helpers.js';
 
 const MAX_PRE_TOOL_ATTEMPTS = 3;
-const RETRY_DELAYS_MS = [1000, 2000];
 const RETRY_STATUS_CALL_PREFIX = 'tool-retry';
 
 class ConversationEngine {
@@ -40,6 +40,7 @@ class ConversationEngine {
   async processTurn(options = {}) {
     const { signal, onAssistantMessage, onToolResult } = options;
     const { allowed, schemas: tools } = getTurnToolSchemas(this.conversationManager.getMessages(), toolRegistry);
+    const requestedActions = new Set([...allowed].filter(name => ACTION_TOOL_NAMES.has(name)));
 
     // Get initial assistant response
     let aiResponse = await SimulacrumCore.generateResponse(this.conversationManager.getMessages(), {
@@ -85,21 +86,26 @@ class ConversationEngine {
     // If parse error persists after retries, return failure message
     if (aiResponse && aiResponse._parseError) {
       const errorMessage = buildGenericFailureMessage();
-      if (onAssistantMessage) onAssistantMessage(errorMessage);
+      if (onAssistantMessage) await onAssistantMessage(errorMessage);
       return errorMessage;
     }
 
-    // If tool failure persists after retries, run tool-free fallback flow
+    // A failed invocation cannot be turned into verified work by a prose fallback.
     if (aiResponse && isToolCallFailure(aiResponse)) {
-      aiResponse = await this._runToolFailureFallback(aiResponse, signal);
-      if (aiResponse.role === 'assistant') {
-        if (onAssistantMessage) onAssistantMessage(aiResponse);
-        return aiResponse;
-      }
+      const failure = toolFailureMessage('tool_call_failure');
+      this.conversationManager.addMessage('assistant', failure.content);
+      if (onAssistantMessage) await onAssistantMessage({ ...failure, _fromToolLoop: true });
+      return failure;
     }
 
     // If no tools, emit assistant and finish
     if (!Array.isArray(aiResponse.toolCalls) || aiResponse.toolCalls.length === 0) {
+      if (requestedActions.size) {
+        const failure = toolFailureMessage('action_not_executed');
+        this.conversationManager.addMessage('assistant', failure.content);
+        if (onAssistantMessage) await onAssistantMessage({ ...failure, _fromToolLoop: true });
+        return failure;
+      }
       if (onAssistantMessage && aiResponse?.content) {
         await onAssistantMessage({
           role: 'assistant',
@@ -119,6 +125,7 @@ class ConversationEngine {
       initialResponse: aiResponse,
       tools,
       allowedToolNames: allowed,
+      requestedActions,
       conversationManager: this.conversationManager,
       aiClient: SimulacrumCore.aiClient,
       getSystemPrompt: SimulacrumCore.getSystemPrompt.bind(SimulacrumCore),
@@ -145,6 +152,10 @@ class ConversationEngine {
       return limitMessage;
     }
     // If loop produced a distinct final message and it wasn't already emitted by the loop handler, emit to UI
+    if (finalResponse && ['provider_failure', 'tool_call_failure'].includes(finalResponse._terminalReason)) {
+      this.conversationManager.addMessage('assistant', finalResponse.content);
+      await this.conversationManager.save();
+    }
     if (finalResponse && finalResponse.content && onAssistantMessage && !finalResponse._emitted) {
       await onAssistantMessage({
         role: 'assistant',
@@ -157,46 +168,6 @@ class ConversationEngine {
     return finalResponse;
   }
 
-  async _runToolFailureFallback(failedResponse, signal) {
-    appendToolFailureCorrection(this.conversationManager, failedResponse);
-
-    const fallbackInstruction =
-      'Tool calls are temporarily disabled. Provide a plain language response without using any tools.';
-    const messages = this.conversationManager.getMessages();
-    const lastMessage = messages[messages.length - 1];
-    if (
-      !lastMessage ||
-      lastMessage.role !== 'system' ||
-      lastMessage.content !== fallbackInstruction
-    ) {
-      this.conversationManager.addMessage('system', fallbackInstruction);
-    }
-
-    let fallbackResponse;
-    try {
-      fallbackResponse = await SimulacrumCore.generateResponse(
-        this.conversationManager.getMessages(),
-        { signal, tools: null }
-      );
-    } catch (_error) {
-      return buildGenericFailureMessage();
-    }
-
-    if (!fallbackResponse || fallbackResponse._parseError || isToolCallFailure(fallbackResponse)) {
-      return buildGenericFailureMessage();
-    }
-
-    const notice = 'Note: Tool functionality was temporarily unavailable for this response.';
-    const content = fallbackResponse.content ? `${fallbackResponse.content}\n\n${notice}` : notice;
-    const display = fallbackResponse.display ? `${fallbackResponse.display}\n\n${notice}` : content;
-
-    return {
-      ...fallbackResponse,
-      content,
-      display,
-      toolCalls: [],
-    };
-  }
 }
 
 export { ConversationEngine };

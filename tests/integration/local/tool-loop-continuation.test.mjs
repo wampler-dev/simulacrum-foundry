@@ -1,10 +1,8 @@
 // Integration test for the tool-loop continuation guarantee (issue #178).
 //
 // Exercises processToolCallLoop end-to-end with fakes for the AI client, the
-// tool registry and the conversation manager. Verifies that every non-terminal
-// result produces exactly one continuation, that a cancelled loop rejects
-// instead of resolving silently, and that exhausted API retries yield a typed
-// terminal fallback carrying visible content.
+// tool registry and the conversation manager. Verifies bounded continuation,
+// cancellation, and truthful terminal failures.
 
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
@@ -42,7 +40,10 @@ const KNOWN_REASONS = [
   'assistant_response',
   'repeat_limit',
   'circuit_breaker',
-  'tool_failure_fallback',
+  'provider_failure',
+  'tool_call_failure',
+  'tool_execution_failure',
+  'action_not_executed',
   'parse_error',
   'cancelled',
 ];
@@ -297,12 +298,12 @@ test(
 );
 
 test(
-  'abort during retry delay: loop rejects promptly instead of sleeping out the delay',
+  'provider cancellation is terminal without another loop retry',
   async () => {
     const controller = new AbortController();
     const { promise, entriesBefore } = startLoop(
       initialResponse2,
-      ['fail', 'hang'],
+      ['hang'],
       { failMessage: 'boom' },
       controller
     );
@@ -326,7 +327,7 @@ test(
     );
     assert.ok(
       Date.now() - abortedAt < 500,
-      `loop rejected promptly after abort (${Date.now() - abortedAt}ms), not after the 1000ms retry delay`
+      `loop rejected promptly after abort (${Date.now() - abortedAt}ms)`
     );
     assert.equal(loggedLoopEndedReason(entriesBefore), 'cancelled');
   },
@@ -334,17 +335,12 @@ test(
 );
 
 test(
-  'api failure: typed terminal fallback with visible content',
+  'api failure: one continuation attempt and deterministic terminal error',
   async () => {
-    const { promise, conversation, entriesBefore } = startLoop(
+    const { promise, conversation, entriesBefore, counter } = startLoop(
       initialResponse3,
-      ['fail', 'fail', 'fail'],
-      {
-        failMessage: 'boom',
-        fallback: rawText(
-          'Tools temporarily unavailable - here is a plain-language summary instead.'
-        ),
-      }
+      ['fail'],
+      { failMessage: 'boom', fallback: rawText('Fabricated success') }
     );
     const result = await promise;
 
@@ -353,29 +349,77 @@ test(
       `unexpected terminal reason: ${result._terminalReason}`
     );
     assert.ok('_terminalReason' in result, 'returned object carries the field');
-    assert.equal(result._terminalReason, 'tool_failure_fallback');
+    assert.equal(result._terminalReason, 'provider_failure');
     assert.ok(
       result.content && result.content.trim().length > 0,
-      'fallback carries visible content'
+      'terminal carries visible content'
     );
-
-    // The fallback injected a system instruction as the final message.
-    const last = conversation.messages[conversation.messages.length - 1];
-    assert.equal(last.role, 'system');
-    assert.equal(loggedLoopEndedReason(entriesBefore), 'tool_failure_fallback');
-    // The fallback provider request must appear in the loop timeline (#178 review).
-    const newEntries = interactionLogger._entries.slice(entriesBefore);
-    const fallbackStarted = newEntries.findIndex(
-      e => e.event === 'api_request_started' && e.details?.mode === 'tool_failure_fallback'
-    );
-    assert.ok(fallbackStarted >= 0, 'fallback request logged as api_request_started');
-    assert.ok(
-      newEntries.some((e, i) => i > fallbackStarted && e.event === 'api_request_finished'),
-      'fallback request logged as api_request_finished'
-    );
+    assert.doesNotMatch(result.content, /Fabricated success/);
+    assert.equal(counter.calls, 1);
+    assert.equal(conversation.messages.some(message => message.role === 'system'), false);
+    assert.equal(loggedLoopEndedReason(entriesBefore), 'provider_failure');
   },
   { timeout: 20000 }
 );
+test('failed tool followed by success prose reports failure instead of displaying the claim', async () => {
+  const originalExecute = toolRegistry.executeTool;
+  toolRegistry.executeTool = async () => ({ result: { error: 'denied', denied: true } });
+  try {
+    const { promise, conversation, onToolResultLog } = startLoop(
+      normalizeAIResponse(rawToolCall('call_denied', 'failing_tool', { justification: 'Modify record' })),
+      [rawText('The record was updated successfully.')]
+    );
+    const result = await promise;
+    assert.equal(result._terminalReason, 'tool_execution_failure');
+    assert.doesNotMatch(result.content, /updated successfully/);
+    assert.equal(onToolResultLog.some(message => /updated successfully/.test(message.content || '')), false);
+    assert.equal(conversation.messages.some(message => /updated successfully/.test(message.content || '')), false);
+  } finally {
+    toolRegistry.executeTool = originalExecute;
+  }
+});
+test('read-only tool does not satisfy an explicit mutation request', async () => {
+  const counter = { calls: 0 };
+  const conversation = createConversationManager();
+  const messages = [];
+  const result = await processToolCallLoop({
+    initialResponse: normalizeAIResponse(rawToolCall('call_read_first', 'read_document', {})),
+    conversationManager: conversation,
+    aiClient: createAiClient([rawText('I changed the record.')], counter),
+    getSystemPrompt: async () => 'test system prompt', tools: [], currentToolSupport: true,
+    requestedActions: new Set(['update_document']),
+    onToolResult: message => messages.push(message),
+  });
+  assert.equal(result._terminalReason, 'action_not_executed');
+  assert.equal(messages.some(message => /changed the record/.test(message.content || '')), false);
+  assert.equal(conversation.messages.some(message => /changed the record/.test(message.content || '')), false);
+});
+test('a successful action after a failed attempt can complete the turn', async () => {
+  const originalExecute = toolRegistry.executeTool;
+  let attempts = 0;
+  toolRegistry.executeTool = async name => {
+    if (name === 'failing_tool') {
+      attempts++;
+      return { result: attempts === 1 ? { error: 'stale read' } : { success: true, documentId: 'actor-1' } };
+    }
+    return originalExecute(name);
+  };
+  try {
+    const conversation = createConversationManager();
+    const result = await processToolCallLoop({
+      initialResponse: normalizeAIResponse(rawToolCall('update_1', 'failing_tool', { justification: 'Update' })),
+      conversationManager: conversation,
+      aiClient: createAiClient([rawToolCall('update_2', 'failing_tool', { justification: 'Retry' }), rawText('The update succeeded.')], { calls: 0 }),
+      getSystemPrompt: async () => 'test system prompt', tools: [], currentToolSupport: true,
+      requestedActions: new Set(['failing_tool']),
+    });
+    assert.equal(attempts, 2);
+    assert.equal(result._terminalReason, 'assistant_response');
+    assert.equal(result.content, 'The update succeeded.');
+  } finally {
+    toolRegistry.executeTool = originalExecute;
+  }
+});
 test(
   'repeat limit: failed tool executions exhaust the limit and value carries repeat_limit',
   async () => {
@@ -411,7 +455,9 @@ test('terminal reason coverage: exercised reasons are all in the known set', asy
     'end_loop',
     'repeat_limit',
     'circuit_breaker',
-    'tool_failure_fallback',
+    'provider_failure',
+    'tool_call_failure',
+    'tool_execution_failure',
     'parse_error',
     'cancelled',
   ]) {

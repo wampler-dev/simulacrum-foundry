@@ -1,5 +1,9 @@
 /** A deliberately small, request-scoped tool surface. Permission prompts remain separate. */
 const READ = ['search_documents', 'list_documents', 'read_document', 'read_tool_output', 'end_loop'];
+export const ACTION_TOOL_NAMES = new Set([
+  'create_document', 'update_document', 'delete_document', 'document_copy', 'document_move',
+  'set_document_ownership', 'run_javascript', 'execute_macro',
+]);
 
 export function getTurnToolNames(messages) {
   const request = [...messages].reverse().find(message => message.role === 'user')?.content || '';
