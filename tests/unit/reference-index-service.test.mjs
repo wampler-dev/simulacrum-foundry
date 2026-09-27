@@ -416,3 +416,15 @@ test('embedded-name resolution respects token boundaries', () => {
 
   assert.equal(result.matches.some(match => match.name === 'Hobgoblin Warrior'), false);
 });
+
+
+test('compact reference exposes interoperable raw documentId', () => {
+  const service = new ReferenceIndexService();
+  const compact = service.compact(record({
+    uuid: 'Compendium.dnd-monster-manual.actors.Actor.mmGoblinWarrior0',
+  }));
+
+  assert.equal(compact.documentId, 'mmGoblinWarrior0');
+  assert.equal(compact.packId, 'dnd-monster-manual.actors');
+  assert.equal(compact.documentType, 'Actor');
+});
