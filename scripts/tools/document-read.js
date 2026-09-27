@@ -13,7 +13,7 @@ export class DocumentReadTool extends BaseTool {
   constructor() {
     super(
       'read_document',
-      'Read selected document fields or the document data without embedded collections by default. Set includeEmbedded=true to read embedded collections. Large results require narrower fields or line ranges. This read establishes the source-qualified prerequisite for update/delete.'
+      'Read selected document fields or the document data without embedded collections by default. For existing portrait/token artwork, set view="artwork" to read those fields without guessing paths; use search_assets only for alternatives or missing artwork. Set includeEmbedded=true to read embedded collections. Large results require narrower fields or line ranges. This read establishes the source-qualified prerequisite for update/delete.'
     );
     this.schema = {
       type: 'object',
@@ -37,6 +37,10 @@ export class DocumentReadTool extends BaseTool {
         fields: {
           type: 'array', minItems: 1, items: { type: 'string' },
           description: 'Optional dot-path fields to return, such as ["name", "system.attributes.ac.value", "prototypeToken.texture.src"]. Missing fields are listed explicitly.',
+        },
+        view: {
+          type: 'string', enum: ['artwork'],
+          description: 'Read only the current name and image; Actor also reads prototypeToken.texture.src. Do not combine with fields. This reads existing document data, not alternative assets.',
         },
         pack: {
           type: 'string',
@@ -76,6 +80,15 @@ export class DocumentReadTool extends BaseTool {
     try {
       this.validateParameters(parameters, this.schema);
       const { documentType } = parameters;
+      if (parameters.view !== undefined && parameters.view !== 'artwork') {
+        throw new Error('Unsupported document view');
+      }
+      if (parameters.view !== undefined && parameters.fields !== undefined) {
+        throw new Error('Use either view or fields, not both');
+      }
+      const fields = parameters.view === 'artwork'
+        ? ['name', 'img', ...(documentType === 'Actor' ? ['prototypeToken.texture.src'] : [])]
+        : parameters.fields;
       const { documentId, pack } = this._resolveDocumentIdentity(parameters);
 
       if (!this.isValidDocumentType(documentType) && !pack) {
@@ -95,7 +108,7 @@ export class DocumentReadTool extends BaseTool {
         return this._createErrorResponse(documentType, 'DOCUMENT_NOT_FOUND', 'Document not found');
       }
 
-      const content = this._formatDocumentContent(document, documentId, { ...parameters, pack });
+      const content = this._formatDocumentContent(document, documentId, { ...parameters, fields, pack });
       if (content.length + documentType.length + (document?.name || documentId).length + 8 > 12000) {
         return this._createErrorResponse(documentType, 'READ_TOO_LARGE',
           'Read output exceeds 12000 characters. Request specific fields or a narrower line range.');

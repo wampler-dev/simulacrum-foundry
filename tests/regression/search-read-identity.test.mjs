@@ -4,6 +4,7 @@ import { DocumentSearchTool } from '../../scripts/tools/document-search.js';
 import { DocumentReadTool } from '../../scripts/tools/document-read.js';
 import { DocumentAPI } from '../../scripts/core/document-api.js';
 import { documentReadRegistry } from '../../scripts/utils/document-read-registry.js';
+import { getTurnToolNames } from '../../scripts/core/turn-capabilities.js';
 
 test('search hands world and pack result arguments directly to read', async t => {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'game');
@@ -103,4 +104,34 @@ test('exact source title hands one selected identity to a field read', async t =
   assert.equal(read.error, undefined);
   assert.match(read.content, /"system.hp": 7/);
   assert.doesNotMatch(read.content, /99/);
+});
+
+test('exact source to existing artwork uses a targeted read without asset search', async t => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'game');
+  const pack = { collection: 'dnd5e.monsters', metadata: { title: 'Monster Manual' }, documentName: 'Actor',
+    testUserPermission: () => true, getIndex: async () => [{ _id: 'goblin', name: 'Goblin Warrior' }] };
+  const packs = [pack];
+  packs.get = id => id === pack.collection ? pack : null;
+  globalThis.game = { user: { isGM: true }, documentTypes: { Actor: ['npc'] },
+    collections: new Map([['Actor', { contents: [] }]]), packs };
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, 'game', previous);
+    else delete globalThis.game;
+    documentReadRegistry.clear();
+  });
+  const request = 'Find Goblin Warrior in the Monster Manual and tell me what portrait and token it already uses';
+  assert.equal(getTurnToolNames([{ role: 'user', content: request }]).has('search_assets'), false);
+  const found = JSON.parse((await new DocumentSearchTool().execute({ query: 'Goblin Warrior', exact: true, source: 'Monster Manual' })).content);
+  assert.equal(found.status, 'unique');
+  t.mock.method(DocumentAPI, 'getDocument', async (_type, id, options) => {
+    assert.equal(id, 'goblin');
+    assert.equal(options.pack, 'dnd5e.monsters');
+    return { _id: id, name: 'Goblin Warrior', img: 'goblin-portrait.webp',
+      prototypeToken: { texture: { src: 'goblin-token.webp' } }, system: { hp: 7 } };
+  });
+  const result = await new DocumentReadTool().execute({ ...found.candidates[0].read_document, view: 'artwork' });
+  assert.equal(result.error, undefined);
+  assert.match(result.content, /goblin-portrait.webp/);
+  assert.match(result.content, /goblin-token.webp/);
+  assert.doesNotMatch(result.content, /"hp"/);
 });

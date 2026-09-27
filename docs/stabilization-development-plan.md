@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Paused by owner on 2026-09-27 with open runtime gates. C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, and L1–L5 were owner-accepted for implemented code or disposition. H7 live rendering validation, the remaining M10 runtime assessment, the pack read permission candidate, and final runtime acceptance remain open. JS enhancements 1–2 are owner-accepted; JS enhancement 3 is implemented and awaits owner acceptance. Runtime behavior remains unverified.**
+Status: **Paused by owner on 2026-09-27 with open runtime gates. C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, and L1–L5 were owner-accepted for implemented code or disposition. H7 live rendering validation, the remaining M10 runtime assessment, the pack read permission candidate, and final runtime acceptance remain open. JS enhancements 1–3 are owner-accepted; JS enhancement 4 is implemented and awaits owner acceptance. Runtime behavior remains unverified.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -538,6 +538,15 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: regression tests inspect bounded broad results, duplicate-source ambiguity, pack-title selection, no match, malformed identity failure, and JSON candidate arguments consumed by a selected-field read. Regression 74/74, integration 23/23, security 27/27, component 1/1, and policy passed; syntax and whitespace checks passed. The static tier remains unavailable without local ESLint dependencies.
 - Limits: the broad result limit is a cap, not a count of all matches; reaching it cannot prove additional matches exist. Search order remains Foundry world/type/pack traversal order, and the model still chooses a candidate for broad ambiguous results. No token reduction, qwen3:14b tool behavior, or live Foundry v14 behavior was measured. H7, M10, pack permission, and final acceptance gates remain paused.
 - Commit: the commit containing this entry and result contract is titled “refactor: structure document search handoff”.
+- Status: **Owner accepted** on 2026-09-27: “Please continue, I accept.” Continuation was scoped to JS enhancement 4. No paused runtime gate was closed.
+
+### JS enhancement 4 — targeted existing artwork read — 2026-09-27
+
+- Authorization: the owner accepted JS enhancement 3 and directed continuation. This authorizes only the next prioritized selected-artwork read optimization.
+- Disposition: **Reuse `read_document` field selection**. Optional `view="artwork"` projects `name` and `img`, plus `prototypeToken.texture.src` for Actors, from the same authoritative source-qualified read. It is mutually exclusive with explicit `fields`; absent values appear in `missingFields`. No new tool, index, asset search, or Foundry mutation was added. The existing turn selector does not expose `search_assets` for clear requests about artwork the document already uses; alternative artwork requests retain it.
+- Evidence: regression fixtures exercise world and pack Actors, large unrelated system data, missing images, non-Actor Item artwork, conflicting arguments, and exact source → artwork read with no asset-search capability. Regression 78/78, integration 23/23, security 27/27, component 1/1, and policy passed; syntax and whitespace checks passed.
+- Limits: the model must request the artwork view; JavaScript selects the paths after that choice. This is an Actor-oriented projection over Foundry field data, not proof of every system's art conventions. A missing field does not trigger an autonomous alternative asset search. Real Foundry v14/D&D5e and qwen3:14b behavior remain unmeasured under the paused gates. The static tier needs absent ESLint dependencies.
+- Commit: the commit containing this entry and selected-read change is titled “feat: targeted document artwork view”.
 - Status: **Implemented; awaiting owner acceptance**. No other enhancement was authorized.
 
 ### Newly observed candidate — pack read permissions (investigate with separate authorization)

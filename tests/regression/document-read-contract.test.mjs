@@ -13,7 +13,8 @@ function setup(t, large = false) {
     testUserPermission() { return true; }
     toObject() {
       return { _id: 'same', name: 'Goblin', system: { attributes: { ac: { value: 15 }, hp: { value: 7 } } },
-        img: 'portrait.webp', items: [{ _id: 'item', name: 'Sword' }], effects: [{ _id: 'effect' }],
+        img: 'portrait.webp', prototypeToken: { texture: { src: 'token.webp' } },
+        items: [{ _id: 'item', name: 'Sword' }], effects: [{ _id: 'effect' }],
         description: large ? 'x'.repeat(15000) : 'short' };
     }
   }
@@ -79,6 +80,41 @@ test('oversized full output fails with a field hint; selected reads remain bound
   assert.ok(selected.content.length < 12000);
   const invalidPage = await tool.execute({ documentType: 'Actor', documentId: 'same', startLine: 50000 });
   assert.equal(invalidPage.error.type, 'UNKNOWN_ERROR');
+});
+
+test('artwork view reads existing portrait and token without serializing unrelated fields', async t => {
+  setup(t, true);
+  const tool = new DocumentReadTool();
+  for (const pack of [undefined, 'world.monsters']) {
+    const args = { documentType: 'Actor', documentId: 'same', ...(pack ? { pack } : {}), view: 'artwork' };
+    const selected = payload(await tool.execute(args));
+    assert.deepEqual(selected.fields, { name: 'Goblin', img: 'portrait.webp', 'prototypeToken.texture.src': 'token.webp' });
+    assert.deepEqual(selected.missingFields, []);
+    assert.equal(selected.pack, pack);
+    assert.equal(documentReadRegistry.hasBeenRead('Actor', 'same', pack), true);
+  }
+  assert.match((await tool.execute({ documentType: 'Actor', documentId: 'same', view: 'artwork', fields: ['name'] })).error.message,
+    /either view or fields/);
+  assert.match((await tool.execute({ documentType: 'Actor', documentId: 'same', view: 'unknown' })).error.message,
+    /Unsupported document view|validation/i);
+});
+
+test('artwork view reports missing images instead of inventing an asset path', async t => {
+  setup(t);
+  t.mock.method(DocumentAPI, 'getDocument', async () => ({ _id: 'same', name: 'Unillustrated', system: { hp: 7 } }));
+  const selected = payload(await new DocumentReadTool().execute({ documentType: 'Actor', documentId: 'same', view: 'artwork' }));
+  assert.deepEqual(selected.fields, { name: 'Unillustrated' });
+  assert.deepEqual(selected.missingFields, ['img', 'prototypeToken.texture.src']);
+});
+
+test('non-Actor artwork view does not imply a token image', async t => {
+  setup(t);
+  game.documentTypes.Item = ['weapon'];
+  game.collections.set('Item', {});
+  t.mock.method(DocumentAPI, 'getDocument', async () => ({ _id: 'item', name: 'Sword', img: 'sword.webp' }));
+  const selected = payload(await new DocumentReadTool().execute({ documentType: 'Item', documentId: 'item', view: 'artwork' }));
+  assert.deepEqual(selected.fields, { name: 'Sword', img: 'sword.webp' });
+  assert.deepEqual(selected.missingFields, []);
 });
 
 test('published read examples validate and execute against matching world and pack fixtures', async t => {
