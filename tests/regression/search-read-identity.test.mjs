@@ -71,3 +71,36 @@ test('read accepts linked and bare top-level UUIDs, rejects mismatched and embed
   }
   assert.equal(observed.length, 2);
 });
+
+test('exact source title hands one selected identity to a field read', async t => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'game');
+  const pack = {
+    collection: 'dnd5e.monsters', metadata: { title: 'Monster Manual' }, documentName: 'Actor',
+    testUserPermission: () => true,
+    getIndex: async () => [{ _id: 'selected', name: 'Goblin Warrior' }],
+  };
+  const packs = [pack];
+  packs.get = id => id === pack.collection ? pack : null;
+  globalThis.game = { user: { isGM: true }, documentTypes: { Actor: ['npc'] },
+    collections: new Map([['Actor', { contents: [{ uuid: 'Actor.other',
+      testUserPermission: () => true, toObject: () => ({ _id: 'other', name: 'Goblin Warrior', system: { hp: 99 } }) }] }]]), packs };
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, 'game', previous);
+    else delete globalThis.game;
+    documentReadRegistry.clear();
+  });
+  const selected = await new DocumentSearchTool().execute({ query: 'Goblin Warrior', exact: true, source: 'Monster Manual' });
+  assert.match(selected.content, /One exact match/);
+  assert.doesNotMatch(selected.content, /system|hp/);
+  const args = JSON.parse(selected.content.match(/read_document: (\{[^}]+\})/)[1]);
+  assert.deepEqual(args, { documentType: 'Actor', documentId: 'selected', pack: 'dnd5e.monsters' });
+  t.mock.method(DocumentAPI, 'getDocument', async (_type, id, options) => {
+    assert.equal(id, 'selected');
+    assert.equal(options.pack, 'dnd5e.monsters');
+    return { _id: id, name: 'Goblin Warrior', system: { hp: 7 } };
+  });
+  const read = await new DocumentReadTool().execute({ ...args, fields: ['system.hp'] });
+  assert.equal(read.error, undefined);
+  assert.match(read.content, /"system.hp": 7/);
+  assert.doesNotMatch(read.content, /99/);
+});

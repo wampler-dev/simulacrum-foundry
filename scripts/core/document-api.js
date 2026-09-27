@@ -1480,17 +1480,37 @@ export class DocumentAPI {
    * @param {string[]} [params.types] - document types to search; defaults to all
    * @param {string} params.query
    * @param {string[]} [params.fields] - dot paths to search; defaults to ['name']
+   * @param {string} [params.source] - 'world', readable pack ID, or exact pack title
+   * @param {boolean} [params.exact=false] - complete name matching only
    * @param {number} [params.maxResults=50]
    * @returns {Promise<object[]>} Result objects with minimal info
    */
-  static async searchDocuments({ types, query, fields = ['name'], pack, maxResults = 50 } = {}) {
+  static async searchDocuments({ types, query, fields = ['name'], pack, source, exact = false, maxResults = 50 } = {}) {
     if (typeof query !== 'string' || !query.trim()) throw new Error('Search query must be non-empty; use list_documents to browse');
     if (!Number.isInteger(maxResults) || maxResults < 1 || maxResults > 100) {
       throw new Error('maxResults must be an integer from 1 to 100');
     }
+    if (source !== undefined) {
+      if (pack) throw new Error('Specify either source or pack, not both');
+      if (typeof source !== 'string' || !source.trim()) throw new Error('Source must be a world selector, pack ID, or exact pack title');
+      if (source.trim().toLowerCase() === 'world') {
+        source = 'world';
+      } else {
+        const requested = source.trim().toLowerCase();
+        const candidates = Array.from(game.packs).filter(p => p.testUserPermission(game.user, 'READ') &&
+          [p.collection, p.metadata?.title || p.title].some(value => typeof value === 'string' && value.trim().toLowerCase() === requested));
+        if (candidates.length !== 1) {
+          throw new Error(candidates.length ? 'Source title is ambiguous; use a pack ID' : 'No readable pack matches that source');
+        }
+        pack = candidates[0].collection;
+      }
+    }
     // Normalize fields: null/empty from LLM tool calls should fall back to default
     if (!Array.isArray(fields) || fields.length === 0) {
       fields = ['name'];
+    }
+    if (exact && (fields.length !== 1 || fields[0] !== 'name')) {
+      throw new Error('Exact reference matching is limited to the document name');
     }
 
     const results = [];
@@ -1502,7 +1522,7 @@ export class DocumentAPI {
         .map(f => String(DocumentAPI.#get(obj, f) ?? ''))
         .join(' ')
         .toLowerCase();
-      return hay.includes(q);
+      return exact ? hay.trim() === q : hay.includes(q);
     };
 
     // Search a specific compendium pack
@@ -1565,7 +1585,7 @@ export class DocumentAPI {
 
       // 2. Search Compendium Packs
       // Only search packs that contain this document type
-      const packs = game.packs.filter(p => p.documentName === t);
+      const packs = source === 'world' ? [] : game.packs.filter(p => p.documentName === t);
       for (const p of packs) {
         // Check pack visibility/permission (User can generally read visible packs)
         if (!p.testUserPermission(game.user, 'READ')) continue;

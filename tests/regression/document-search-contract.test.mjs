@@ -16,7 +16,8 @@ function setup(t) {
   ]);
   const requests = [];
   const packs = [...indexes].map(([collection, index]) => ({
-    collection, documentName: 'Actor', testUserPermission: () => true,
+    collection, metadata: { title: collection === 'world.one' ? 'Monster Manual' : 'Other Monsters' },
+    documentName: 'Actor', testUserPermission: () => true,
     getIndex: async options => { requests.push({ collection, options }); return index; },
   }));
   packs.get = id => packs.find(pack => pack.collection === id);
@@ -77,4 +78,43 @@ test('empty or unbounded query fails before searching, and exact empty result st
   const tool = new DocumentSearchTool();
   assert.equal((await tool.execute({ query: ' ' })).error.type, 'SEARCH_FAILED');
   assert.deepEqual(await DocumentAPI.searchDocuments({ query: 'unmatched' }), []);
+});
+
+test('exact names resolve a readable source without treating the index as document facts', async t => {
+  const { requests } = setup(t);
+  const tool = new DocumentSearchTool();
+  const ambiguous = await tool.execute({ query: 'Goblin', exact: true });
+  assert.match(ambiguous.content, /Ambiguous exact name/);
+  assert.equal((ambiguous.content.match(/read_document:/g) || []).length, 2);
+  assert.doesNotMatch(ambiguous.content, /Goblin Veteran|Goblin Shaman/);
+  assert.equal(requests.length, 1, 'stop as soon as a second exact candidate proves ambiguity');
+
+  const selected = await tool.execute({ query: 'gObLiN', exact: true, source: 'monster manual' });
+  assert.match(selected.content, /One exact match/);
+  assert.match(selected.content, /identity only.*read_document/);
+  assert.match(selected.content, /"pack":"world.one"/);
+  assert.doesNotMatch(selected.content, /note|fire|ice/);
+  assert.equal((selected.content.match(/read_document:/g) || []).length, 1);
+  assert.match((await tool.execute({ query: 'Goblin', exact: true, source: 'world.one' })).content, /One exact match/);
+
+  const world = await tool.execute({ query: 'Goblin', exact: true, source: 'world' });
+  assert.match(world.content, /One exact match/);
+  assert.doesNotMatch(world.content, /"pack":/);
+  const missing = await tool.execute({ query: 'Goblin', exact: true, source: 'Unknown Manual' });
+  assert.equal(missing.error.type, 'SEARCH_FAILED');
+  const notFound = await tool.execute({ query: 'Missing', exact: true, source: 'world.one' });
+  assert.match(notFound.content, /No exact match/);
+  assert.match((await tool.execute({ query: 'Gob', exact: true })).content, /No exact match/);
+});
+
+test('same-title and hidden sources cannot be silently selected', async t => {
+  setup(t);
+  const tool = new DocumentSearchTool();
+  game.packs[1].metadata.title = 'Monster Manual';
+  assert.match((await tool.execute({ query: 'Goblin', exact: true, source: 'Monster Manual' })).error.message, /ambiguous/);
+  game.packs[1].testUserPermission = () => false;
+  assert.match((await tool.execute({ query: 'Goblin', exact: true, source: 'world.two' })).error.message, /No readable pack/);
+  assert.match((await tool.execute({ query: 'Goblin', exact: true, source: 'Monster Manual' })).content, /One exact match/);
+  assert.match((await tool.execute({ query: 'Goblin', exact: true, source: 'world', pack: 'world.one' })).error.message, /either source or pack/);
+  assert.match((await tool.execute({ query: 'Goblin', exact: true, fields: ['note'] })).error.message, /limited to the document name/);
 });

@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Paused by owner on 2026-09-27 with open runtime gates. C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, and L1–L5 were owner-accepted for implemented code or disposition. H7 live rendering validation, the remaining M10 runtime assessment, the pack read permission candidate, and final runtime acceptance remain open. The owner permits separately authorized JavaScript enhancements during this pause; no specific enhancement has been authorized by the pause itself.**
+Status: **Paused by owner on 2026-09-27 with open runtime gates. C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, and L1–L5 were owner-accepted for implemented code or disposition. H7 live rendering validation, the remaining M10 runtime assessment, the pack read permission candidate, and final runtime acceptance remain open. A separately authorized exact-reference search enhancement is implemented and awaits owner acceptance; its runtime behavior is unverified.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -512,6 +512,15 @@ No scope expansion and no new task without the owner's explicit permission.
 - Authorization: after the L5 acceptance, the owner directed “Accepted, continue.” This authorizes resuming the pending H7 live rendering validation; it does not authorize unrelated runtime investigations.
 - Attempt: the authorized cloud browser opened `https://foundry.wampler.app/join` and `https://foundry.wampler.app/`. Both displayed “Site Unavailable — Unable to access this site.” No Foundry login, world, module version, sidebar, or rendering surface was reachable from that browser.
 - Status: **Blocked; H7 remains open**. Obtain an accessible isolated Foundry v14 test world with the restart branch installed and test account access before testing malicious attributes/URLs in final, streaming, and tool output. This retry establishes no safety or exploitability result and does not establish whether the restart branch is installed at the host.
+
+### JS enhancement 1 — exact named reference and source — 2026-09-27
+
+- Authorization: the owner selected the first prioritized optimization and explicitly directed “Do it. I accept.” This authorizes only an exact named reference path over the existing search/read contract.
+- Disposition: **Extend `search_documents`, not the tool framework**. `exact=true` matches the complete name and stops after two candidates. Zero is no match; one is a source-qualified identity for `read_document`; two means ambiguity and requires a source or user choice. `source` accepts `world`, a pack ID, or an exact readable pack title. Duplicate titles and unknown/inaccessible sources fail explicitly. Existing broad search and pack selection remain available. Search index matches are not presented as document facts, and the tool instructs the model to read the selected document for facts.
+- Evidence: regression tests cover world/pack duplicate names, exact title selection, title collision, inaccessible and unknown sources, no match, source mismatch, and source-qualified search-to-selected-field-read handoff. Regression 72/72, integration 23/23, security 26/26, component 1/1, and policy passed; syntax and whitespace checks passed.
+- Limits: the model must still supply the name and source as tool arguments; this does not parse arbitrary natural-language source phrases or automatically read the document. Two candidates establish ambiguity but do not enumerate every duplicate. The static tier cannot run in this checkout without installed ESLint dependencies. Real Foundry v14/D&D5e metadata, pack permission behavior, and qwen3:14b tool use remain unverified under the paused runtime gates.
+- Commit: the commit containing this entry and search change is titled “feat: exact source-qualified document search”.
+- Status: **Implemented; awaiting owner acceptance**. No paused runtime gate is closed.
 
 ### Newly observed candidate — pack read permissions (investigate with separate authorization)
 
