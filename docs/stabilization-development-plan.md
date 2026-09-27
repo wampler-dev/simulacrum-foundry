@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, L1, L2, and L4 owner-accepted for implemented code. H7 live validation is pending by owner direction. The narrow M10 recovery fix is accepted, while its runtime assessment remains open pending measurement. L3 leave-alone disposition awaits owner acceptance. Work dependent on live validation waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, L1, L2, L3, and L4 owner-accepted for implemented code or disposition. H7 live validation is pending by owner direction. The narrow M10 recovery fix is accepted, while its runtime assessment remains open pending measurement. L5 awaits owner acceptance. Work dependent on live validation waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -492,7 +492,16 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: tests/regression/document-schema-reflection.test.mjs exercises a top-level Actor, a dnd5e-shaped NPC subtype field, and an embedded Activity class through `getDocumentSchema`. Existing read/search/create/update tests continue to exercise other DocumentAPI paths. Regression 67/67, integration 23/23, security 26/26, component 1/1, and policy passed; git whitespace check passed.
 - Limits: fixture behavior does not prove Foundry v14/D&D5e runtime metadata, permission behavior, or exhaustive schema coverage. The separately tracked compendium read permission candidate is still open; this leave-alone recommendation does not resolve it. H7 live validation remains pending.
 - Commit: the commit containing this assessment and behavior fixture is titled “test: document schema reflection contract (L3)”.
-- Status: **Leave-alone disposition awaiting owner acceptance**. No other finding was closed.
+- Status: **Owner accepted** on 2026-09-27: “Accepted, continue.” Continuation was scoped to L5. No other finding was closed.
+
+### L5 bounded interaction diagnostics — 2026-09-27
+
+- Authorization: the owner accepted the L3 leave-alone disposition and directed continuation. This authorizes L5 only.
+- Disposition: **Simplify diagnostic persistence**. Ordinary logging remains enabled and retains timestamps, message lengths, tool identity, result success/duration, and correlated loop events. It no longer stores a second full copy of conversation text, tool arguments/results, or the custom system prompt. With `CONFIG.debug.simulacrum === true`, message, argument, and result previews are limited to 500 characters. Persisted logs are limited to 500 entries; loading older logs drops excess entries and bounds retained payloads. Loop event details preserve named fields for diagnostics with bounded keys and values. Saved flags and exports apply the current debug policy.
+- Evidence: `tests/regression/interaction-log-bounds.test.mjs` checks normal persisted diagnostics without large duplicate payloads, debug previews, legacy flag loading, eviction, and redaction after debug is disabled. Existing tool-loop integration tests verify the loop reason contract. Regression 69/69, integration 23/23, security 26/26, component 1/1, and policy passed; git whitespace check passed.
+- Limits: debug previews can contain user or tool data by explicit debug policy. Existing persisted flags are bounded on the next load and subsequent save; live Foundry persistence, UI export, and privacy behavior remain unmeasured until H7. This does not change conversation history or console logger output.
+- Commit: the commit containing this entry and logging changes is titled “fix: bound interaction diagnostics (L5)”.
+- Status: **Implemented; awaiting owner acceptance**. No other finding was closed.
 
 ### Newly observed candidate — pack read permissions (investigate with separate authorization)
 

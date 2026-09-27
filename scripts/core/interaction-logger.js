@@ -6,11 +6,48 @@
  * Persists to FoundryVTT flags, cleared when conversation is cleared.
  */
 
-import { createLogger } from '../utils/logger.js';
+import { createLogger, isDebugEnabled } from '../utils/logger.js';
 
 const logger = createLogger('InteractionLogger');
 const LOGGER_VERSION = '1.0.0';
 const FLAG_KEY = 'interactionLog';
+const MAX_ENTRIES = 500;
+const PREVIEW_CHARS = 500;
+const DETAIL_CHARS = 100;
+
+function preview(value, limit = PREVIEW_CHARS) {
+  const text = typeof value === 'string' ? value : JSON.stringify(value);
+  if (!text) return null;
+  return text.length > limit ? `${text.slice(0, limit)} [truncated]` : text;
+}
+
+function boundedEntry(entry, debug = isDebugEnabled()) {
+  const metadata = entry?.metadata || {};
+  const next = {
+    id: preview(entry?.id, 100), timestamp: preview(entry?.timestamp, 100), type: entry?.type,
+    content: debug && typeof entry?.content === 'string' ? preview(entry.content) : null,
+  };
+  if (entry?.type === EntryType.TOOL_CALL) {
+    next.metadata = { toolName: preview(metadata.toolName, 100), toolCallId: preview(metadata.toolCallId, 100),
+      ...(debug && (metadata.argumentsPreview || metadata.arguments)
+        ? { argumentsPreview: preview(metadata.argumentsPreview || metadata.arguments) } : {}) };
+  } else if (entry?.type === EntryType.TOOL_RESULT) {
+    next.metadata = { toolCallId: preview(metadata.toolCallId, 100), success: metadata.success,
+      durationMs: metadata.durationMs };
+  } else if (entry?.type === EntryType.ASSISTANT) {
+    next.metadata = { hasToolCalls: metadata.hasToolCalls, toolCallCount: metadata.toolCallCount,
+      contentLength: metadata.contentLength };
+  } else if (entry?.type === EntryType.LOOP_EVENT) {
+    next.loopId = preview(entry.loopId, 100);
+    next.event = preview(entry.event, 100);
+    next.details = Object.fromEntries(Object.entries(entry.details || {}).slice(0, 12)
+      .map(([key, value]) => [key.slice(0, DETAIL_CHARS),
+        typeof value === 'number' || typeof value === 'boolean' ? value : preview(value, DETAIL_CHARS)]));
+  } else if (entry?.type === EntryType.USER || entry?.type === EntryType.SYSTEM) {
+    next.metadata = { contentLength: metadata.contentLength };
+  }
+  return next;
+}
 
 /**
  * Entry types for logged interactions
@@ -33,7 +70,7 @@ class InteractionLogger {
     this._entries = [];
     this._sessionStart = new Date().toISOString();
     this._enabled = true; // Enabled by default
-    this._maxEntries = 5000; // FIFO limit to prevent memory issues
+    this._maxEntries = MAX_ENTRIES;
     this._saveDebounceTimer = null;
   }
 
@@ -62,7 +99,7 @@ class InteractionLogger {
     try {
       if (typeof game !== 'undefined' && game?.user && typeof game.user.setFlag === 'function') {
         const state = {
-          entries: this._entries,
+          entries: this._entries.slice(-this._maxEntries).map(entry => boundedEntry(entry)),
           sessionStart: this._sessionStart,
           v: 1,
         };
@@ -83,8 +120,8 @@ class InteractionLogger {
     try {
       if (typeof game !== 'undefined' && game?.user && typeof game.user.getFlag === 'function') {
         const state = await game.user.getFlag('simulacrum', this._getPersistenceKey());
-        if (state && state.entries) {
-          this._entries = state.entries;
+        if (state && Array.isArray(state.entries)) {
+          this._entries = state.entries.slice(-this._maxEntries).map(entry => boundedEntry(entry));
           this._sessionStart = state.sessionStart || new Date().toISOString();
           return true;
         }
@@ -139,7 +176,7 @@ class InteractionLogger {
    * @private
    */
   _addEntry(entry) {
-    this._entries.push(entry);
+    this._entries.push(boundedEntry(entry));
 
     // FIFO eviction if over limit
     while (this._entries.length > this._maxEntries) {
@@ -162,12 +199,13 @@ class InteractionLogger {
     // (success, durationMs). Logging here would cause duplicates.
     if (message.role === 'tool') return;
 
-    const { toolCalls, metadata } = context;
+    const { toolCalls } = context;
     const baseEntry = {
       id: this._generateId(),
       timestamp: new Date().toISOString(),
       type: message.role,
-      content: message.content,
+      content: isDebugEnabled() ? preview(message.content) : null,
+      metadata: { contentLength: typeof message.content === 'string' ? message.content.length : 0 },
     };
 
     // Add role-specific metadata
@@ -175,7 +213,7 @@ class InteractionLogger {
       baseEntry.metadata = {
         hasToolCalls: Boolean(toolCalls && toolCalls.length > 0),
         toolCallCount: toolCalls?.length || 0,
-        ...(metadata?.provider_metadata ? { provider_metadata: metadata.provider_metadata } : {}),
+        contentLength: baseEntry.metadata.contentLength,
       };
     } else if (message.role === 'system') {
       baseEntry.type = EntryType.SYSTEM;
@@ -201,7 +239,7 @@ class InteractionLogger {
       metadata: {
         toolName,
         toolCallId,
-        arguments: args,
+        ...(isDebugEnabled() ? { argumentsPreview: preview(args) } : {}),
       },
     });
   }
@@ -220,7 +258,7 @@ class InteractionLogger {
       id: this._generateId(),
       timestamp: new Date().toISOString(),
       type: EntryType.TOOL_RESULT,
-      content: typeof result === 'string' ? result : JSON.stringify(result),
+      content: isDebugEnabled() ? preview(result) : null,
       metadata: {
         toolCallId,
         success,
@@ -253,7 +291,7 @@ class InteractionLogger {
    * @returns {Array} Log entries
    */
   getEntries() {
-    return [...this._entries];
+    return this._entries.map(entry => boundedEntry(entry));
   }
 
   /**
@@ -333,8 +371,8 @@ class InteractionLogger {
    */
   _formatToolCallLine(entry, time) {
     const toolName = entry.metadata?.toolName || 'unknown';
-    const args = entry.metadata?.arguments ? JSON.stringify(entry.metadata.arguments) : '';
-    return `[${time}] Tool: ${toolName}(${args.substring(0, 300)})\n`;
+    const args = entry.metadata?.argumentsPreview || '';
+    return `[${time}] Tool: ${toolName}(${args})\n`;
   }
 
   /**
@@ -366,17 +404,14 @@ class InteractionLogger {
    * @returns {string} JSON export
    */
   export() {
-    const customSystemPrompt = game?.settings?.get('simulacrum', 'customSystemPrompt') || '';
-
     const exportData = {
       version: LOGGER_VERSION,
       exportedAt: new Date().toISOString(),
       worldId: game?.world?.id || 'unknown',
       userId: game?.user?.id || 'unknown',
       sessionStart: this._sessionStart,
-      customSystemPrompt: customSystemPrompt,
       entryCount: this._entries.length,
-      entries: this._entries,
+      entries: this.getEntries(),
     };
 
     return JSON.stringify(exportData, null, 2);
