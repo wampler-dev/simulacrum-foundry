@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1 implementation awaiting owner acceptance. Other tasks remain unauthorized.**
+Status: **Required scope; C1 resolved by owner-approved removal. Other tasks remain unauthorized.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -238,6 +238,7 @@ No scope expansion and no new task without the owner's explicit permission.
 - Behavior change: macros with a const tool configuration no longer become custom AI tools. Existing macro documents and the explicit execute_macro tool are unchanged. README now documents this and requires a Foundry reload to discard previous in-memory tools/hooks.
 - Evidence: two behavioral security tests ran against the original code and both failed, observing configuration expression execution for enabled and disabled macros in world/pack discovery. The same tests now pass with zero evaluations, macro executions, pack loads, registrations, or discovery hooks during initialization and refresh.
 - Verification: security tier 4/4 passed; local integration tier 14/14 passed; required-test policy and git diff whitespace checks passed. No live Foundry/D&D5e/Ollama acceptance was performed.
-- Commit: the commit containing this resolution entry and the C1 implementation (locate through git history for this document).
+- Implementation commit: [d40406096d5c485a494b44ddc20597c4ddcdf825](https://github.com/wampler-dev/simulacrum-foundry/commit/d40406096d5c485a494b44ddc20597c4ddcdf825).
 - Remaining: C2's registration path was removed as a consequence of disabling discovery, but C2 is not declared resolved; its final disposition and any future restoration require separate owner authorization. No other finding is claimed fixed.
-- Status: **Awaiting owner acceptance**. The owner has not yet accepted removal of automatic custom-tool discovery as the C1 resolution. All other findings retain their prior status.
+- Owner acceptance: on 2026-09-27, the owner stated “I approve. Track the changes you make in our development plan. Once done, let me know.” following the C1 completion report.
+- Status: **Resolved by owner-approved removal**. Live Foundry/D&D5e/Ollama validation remains outstanding and is not claimed by this closure. All other findings retain their prior status; this acceptance does not authorize C2 or another implementation task.
