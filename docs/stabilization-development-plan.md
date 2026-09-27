@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, and H1 owner-accepted. H7 mitigation awaits live validation and owner acceptance; the restart branch is not installed on the authorized Foundry site. Other tasks remain unauthorized.**
+Status: **Required scope; C1, C2, and H1 owner-accepted. H7 live validation is pending by owner direction. Work dependent on H7 waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -178,6 +178,8 @@ Each stage is a planning group, **not blanket authorization**. Select concrete t
 5. **Resolve remaining measured debt:** M10, L1, L2, L3, L5, plus every open investigation. An accepted leave-alone result is valid; silent deferral is not.
 6. **Run acceptance and owner review:** exercise all scenarios below in the supported environment; attach evidence and obtain explicit closure. No unrelated feature development follows automatically.
 
+H7 live validation is pending by owner direction. Its dependent browser, UI presentation, and final acceptance checks wait until the restart branch can be run in an authorized Foundry v14 environment. Independent remediation items may be considered in the stated order when the owner explicitly authorizes each task. Pending does not mean resolved or accepted.
+
 ## Acceptance matrix
 
 Behavioral acceptance tests are required where they establish cross-component contracts. Source-text assertions may check structure but cannot substitute for running the flow. Do not add tests that merely mirror implementation.
@@ -302,3 +304,10 @@ No scope expansion and no new task without the owner's explicit permission.
 - The owner supplied a phone screenshot showing the Foundry join page at foundry.wampler.app, including a “Server connection re-established” notice. The site is reachable from the owner's phone; the cloud-browser “Site Unavailable” result does **not** establish a general outage.
 - The owner supplied the exact https://foundry.wampler.app/join URL. The cloud browser navigated directly to that route and still displayed “Site Unavailable” / “Unable to access this site.” This is specific to that browser/environment. No Foundry UI was inspected through it.
 - The owner separately confirmed the restart branch is not installed there. A successful join-page visit would still not validate the H7 implementation. H7 remains open; no further route probing, login, production-world injection, or installation was performed.
+
+### H7 deferral decision — 2026-09-27
+
+- The owner directed: “I'm willing to come back to this one. Mark it as pending. Any other development that requires it as a prerequisite can also wait for now.”
+- H7 is **pending**, open, and unaccepted. Do not repeat live access attempts, install the branch, or claim the mitigation is validated until the owner reopens that task and an authorized environment is available.
+- Any work whose correctness requires H7 browser or UI evidence, including final UI presentation acceptance and release readiness, remains pending with it. Independent plan findings are not blocked merely by H7's pending status; each new task still requires the owner's explicit permission under AGENTS.md.
+- This decision changes scheduling only. The H7 code and test evidence are unchanged.
