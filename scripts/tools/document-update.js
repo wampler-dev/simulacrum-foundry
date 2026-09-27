@@ -318,7 +318,8 @@ class DocumentUpdateTool extends BaseTool {
       await DocumentAPI.applyEmbeddedOperations(
         params.documentType,
         params.documentId,
-        embeddedOperations
+        embeddedOperations,
+        { pack: params.pack }
       );
     }
 

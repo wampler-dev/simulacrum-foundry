@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, and H1 owner-accepted. H7 live validation is pending by owner direction. H2 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, and H2 owner-accepted. H7 live validation is pending by owner direction. H3 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -321,4 +321,13 @@ No scope expansion and no new task without the owner's explicit permission.
 - Verification: regression tier **33/33 passed** plus the standalone compaction budget script; integration **14/14**, security **19/19**, policy passed; git whitespace check passed. Static tier still requires uninstalled ESLint dependencies in this checkout. No live Foundry v14/D&D5e document mutation was performed.
 - Limits: a tool can report a failure after an uncertain side effect; this response reports the known phase and unknown source state. H1 approval remains in the dispatcher. M9 copy/move target identity and transaction behavior remain open. H7 remains pending independently.
 - Commit: the commit containing this entry and H2 code is titled “fix: preserve copy and move failure details (H2)”.
+- Status: **Owner accepted** on 2026-09-27: “Accepted, please continue.” The permission to continue was scoped to H3. H7 remains pending.
+
+### H3 implementation — 2026-09-27
+
+- Authorization: the owner accepted H2 and directed “please continue.” This authorizes H3 only.
+- Disposition: **Small fix**. The update tool now passes the selected pack to DocumentAPI.applyEmbeddedOperations. The API selects pack.getDocument(id), validates document type and unlocked state, and uses the existing embedded permission check and Foundry mutation methods. A missing or mismatched pack fails before any world-document lookup or mutation. World operations still use the world collection.
+- Evidence: tests/regression/embedded-pack-target.test.mjs exercises tool-to-API pack handoff, same raw ID in world and pack, ordinary world behavior, missing pack, and mismatched document type. All three behavioral tests pass. Regression 36/36 plus compaction budget, integration 14/14, security 19/19, and policy passed.
+- Limits: mock documents prove routing and pre-mutation rejection, not actual Foundry v14 compendium writes or host permission behavior. H4 read-registry source identity remains open, including same-ID cross-source read prerequisites; H7 browser validation remains pending. Live mutation acceptance is still needed when a suitable installation is available.
+- Commit: the commit containing this entry and H3 code is titled “fix: retain pack target for embedded updates (H3)”.
 - Status: **Awaiting owner acceptance**. No other finding was closed.

@@ -1275,13 +1275,19 @@ export class DocumentAPI {
    * @param {string} documentType
    * @param {string} id
    * @param {Array<object>} operations
+   * @param {Object} [options]
+   * @param {string} [options.pack] - Compendium pack ID (optional)
    */
-  static async applyEmbeddedOperations(documentType, id, operations = []) {
+  static async applyEmbeddedOperations(documentType, id, operations = [], options = {}) {
     if (!Array.isArray(operations) || operations.length === 0) return;
 
-    const collection = this.#resolveCollection(documentType);
-    if (!collection) throw new Error(`Unknown document type: ${documentType}`);
-    const doc = collection.get(id);
+    const collection = options.pack ? game.packs.get(options.pack) : this.#resolveCollection(documentType);
+    if (!collection) throw new Error(options.pack ? `Unknown compendium pack: ${options.pack}` : `Unknown document type: ${documentType}`);
+    if (options.pack && collection.documentName !== documentType) {
+      throw new Error(`Pack '${options.pack}' contains '${collection.documentName}', not '${documentType}'`);
+    }
+    if (options.pack && collection.locked) throw new Error(`Compendium pack is locked: ${options.pack}`);
+    const doc = options.pack ? await collection.getDocument(id) : collection.get(id);
     this.#ensurePermissionFns(doc, collection);
     if (!doc) throw new Error(`Document not found: @UUID[${documentType}.${id}]`);
 
