@@ -69,3 +69,13 @@ test('engine retries with the original capability set after history replacement'
   await new ConversationEngine({ getMessages: () => history, addMessage: () => {} }).processTurn();
   assert.deepEqual(offered, [['read_document'], ['read_document']]);
 });
+
+test('engine accepts a direct answer without starting the tool loop', async t => {
+  const manager = { getMessages: () => turn('Hello') };
+  const emitted = [];
+  t.mock.method(toolRegistry, 'getToolSchemas', () => []);
+  t.mock.method(SimulacrumCore, 'generateResponse', async () => ({ role: 'assistant', content: 'Hello!', toolCalls: [] }));
+  const result = await new ConversationEngine(manager).processTurn({ onAssistantMessage: message => emitted.push(message) });
+  assert.equal(result.content, 'Hello!');
+  assert.deepEqual(emitted.map(message => message.content), ['Hello!']);
+});

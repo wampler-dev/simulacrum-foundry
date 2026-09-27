@@ -9,9 +9,7 @@
  */
 
 /**
- * Append assistant + developer correction messages for a text-only response (missing tool call).
- * In the autonomous tool loop, the AI MUST respond with a tool call - text-only responses
- * are rejected. To exit the loop, the AI must call `end_loop`.
+ * Append assistant + developer correction messages for an empty or unparseable response.
  *
  * @param {object} conversationManager - Conversation manager instance
  * @param {object|string} errorResponse - Normalized AI response or correction message string
@@ -23,7 +21,7 @@ export function appendEmptyContentCorrection(conversationManager, errorResponse)
   const content =
     typeof errorResponse === 'string'
       ? errorResponse
-      : errorResponse?.content || 'No tool call detected';
+      : errorResponse?.content || 'No usable response received';
 
   // Reconstruct the assistant's failed message as a combined content turn.
   // NOTE: We intentionally do NOT include tool_calls in the correction message.
@@ -36,9 +34,9 @@ export function appendEmptyContentCorrection(conversationManager, errorResponse)
   // Mark as _internal so it's not displayed to users on reload
   conversationManager.addMessage('assistant', combinedContent, null, null, { _internal: true });
 
-  // Add a developer instruction explicitly requiring tool call to exit
+  // A valid final answer may be plain text; a tool call is only needed for real work.
   const correctionInstruction =
-    'Your previous response was rejected because it contained no tool call. You are in an autonomous tool execution loop - text-only responses are NOT valid. To exit this loop, you MUST call the `end_loop` tool. Your text is already displayed to the user.';
+    'Your previous response was empty or could not be parsed. Respond with a useful plain-language answer, or call a tool if the requested work requires one.';
   conversationManager.addMessage('developer', correctionInstruction);
 }
 

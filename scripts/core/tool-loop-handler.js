@@ -98,10 +98,6 @@ async function _runLoopIteration(context) {
   let repeatCount = 0;
   let toolFailureAttempts = 0;
 
-  // Circuit breaker: detect repeated identical responses
-  const CIRCUIT_BREAKER_THRESHOLD = 3;
-  let lastResponseContent = null;
-  let consecutiveRepeats = 0;
   let terminalReason = 'unknown';
 
   while (repeatCount < REPEAT_LIMIT) {
@@ -110,48 +106,6 @@ async function _runLoopIteration(context) {
     });
 
     if (context.signal?.aborted) throw new Error('Process was cancelled');
-
-    // Circuit breaker check: detect if AI is generating same text-only response repeatedly
-    const currentContent = currentResponse.content?.trim() || '';
-    const hasToolCalls =
-      Array.isArray(currentResponse.toolCalls) && currentResponse.toolCalls.length > 0;
-
-    if (!hasToolCalls && currentContent.length > 0) {
-      if (currentContent === lastResponseContent) {
-        consecutiveRepeats++;
-        logger.warn(
-          `Circuit breaker: identical text-only response detected (${consecutiveRepeats}/${CIRCUIT_BREAKER_THRESHOLD})`
-        );
-
-        if (consecutiveRepeats >= CIRCUIT_BREAKER_THRESHOLD) {
-          logger.error(
-            `Circuit breaker triggered: AI repeated same response ${consecutiveRepeats} times without tool call`
-          );
-
-          // Emit error to user via hook
-          Hooks.callAll('simulacrumNotifyUser', {
-            message: `<strong>Loop terminated:</strong> The AI model repeatedly failed to call the required <code>end_loop</code> tool to exit the conversation loop. This may indicate the model has limited tool-calling capabilities. Consider using a different model with better function calling support.`,
-            endLoop: true,
-            isError: true,
-          });
-
-          return {
-            content: currentContent,
-            display: currentContent,
-            toolCalls: [],
-            _circuitBreakerTriggered: true,
-            _terminalReason: 'circuit_breaker',
-          };
-        }
-      } else {
-        consecutiveRepeats = 1; // Reset counter for new content
-      }
-      lastResponseContent = currentContent;
-    } else if (hasToolCalls) {
-      // Reset circuit breaker when tool calls are present
-      consecutiveRepeats = 0;
-      lastResponseContent = null;
-    }
 
     // Extract response from tool calls (primary) or use content (fallback)
     // The response parameter is the canonical way for AI to communicate with users
@@ -272,32 +226,19 @@ async function _processLoopCycle(currentResponse, context, state) {
     return { action: 'continue', response, repeatCount, toolFailureAttempts };
   }
 
-  // 3. Terminate if no tools - require end_loop to exit
+  // 3. A substantive assistant answer completes the turn, with or without prior tools.
   if (!Array.isArray(currentResponse.toolCalls) || currentResponse.toolCalls.length === 0) {
-    if (isDebugEnabled()) logger.debug('No tool calls in current AI response; requesting end_loop');
-    // Instead of breaking, ask AI to use end_loop tool
-    repeatCount++;
-    if (repeatCount >= REPEAT_LIMIT) {
-      return { action: 'break', reason: 'repeat_limit' };
-    }
-
-    // PERSIST FIX: Save the AI's text content as a visible message BEFORE adding correction.
-    // This ensures the text is available on reload (live display already shows it via _notifyAssistantMessage).
-    // Only save if there's actual text content (not just whitespace).
     if (currentResponse.content && currentResponse.content.trim().length > 0) {
       context.conversationManager.addMessage('assistant', currentResponse.content);
       await context.conversationManager.save();
+      _finishTaskTracker();
+      return { action: 'return', value: currentResponse, reason: 'assistant_response' };
     }
-
-    // Send comprehensive correction message with loop context and exit options
-    const correctionMessage = `LOOP CONTEXT: You are currently in an autonomous tool execution loop. Text-only responses are rejected - you MUST respond with a tool call.
-
-To exit this loop, call the \`end_loop\` tool. Your text response is already displayed to the user - the end_loop tool just signals that you are done and control should return to the user.
-
-You cannot respond without a tool call. Either continue with the next tool in your plan, or call end_loop to finish.`;
-    await appendEmptyContentCorrection(context.conversationManager, correctionMessage);
+    repeatCount++;
+    if (repeatCount >= REPEAT_LIMIT) return { action: 'break', reason: 'repeat_limit' };
+    appendEmptyContentCorrection(context.conversationManager, currentResponse);
     interactionLogger.logLoopEvent(context.loopId, 'continuation_requested', {
-      reason: 'text_only_correction',
+      reason: 'empty_response_correction',
     });
     const response = await _getNextAIResponse([], context);
     return { action: 'continue', response, repeatCount, toolFailureAttempts };
@@ -381,12 +322,7 @@ You cannot respond without a tool call. Either continue with the next tool in yo
     if (isDebugEnabled()) logger.debug('end_loop tool detected; terminating loop');
 
     // Auto-close task tracker if manage_task has an active task
-    const manageTaskTool = toolRegistry.getTool('manage_task');
-    if (manageTaskTool?.currentTask) {
-      if (isDebugEnabled()) logger.debug('end_loop: closing orphaned task tracker');
-      Hooks.callAll(SimulacrumHooks.TASK_FINISHED);
-      manageTaskTool.currentTask = null;
-    }
+    _finishTaskTracker();
 
     return { action: 'break', reason: 'end_loop' };
   }
@@ -423,6 +359,14 @@ You cannot respond without a tool call. Either continue with the next tool in yo
       const delayMs = getRetryDelayMs(apiAttempt);
       await delayWithSignal(delayMs, context.signal);
     }
+  }
+}
+
+function _finishTaskTracker() {
+  const manageTaskTool = toolRegistry.getTool('manage_task');
+  if (manageTaskTool?.currentTask) {
+    Hooks.callAll(SimulacrumHooks.TASK_FINISHED);
+    manageTaskTool.currentTask = null;
   }
 }
 

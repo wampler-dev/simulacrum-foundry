@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, M1, M2, M3, M4, M7, M8, and M9 owner-accepted for implemented code. H7 live validation is pending by owner direction. H6 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M7, M8, and M9 owner-accepted for implemented code. H7 live validation is pending by owner direction. M5 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -420,6 +420,15 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: tests/security/turn-capabilities.test.mjs exercises offered schema filtering, read-only and explicit actions, native/inline dispatch denial, and retained schemas after a simulated history replacement and initial retry. Security 23/23, regression 59/59, integration 14/14, component 1/1, and policy passed; whitespace check passed.
 - Limits: short English request matching can underselect on unusual wording or compound tasks and may overselect on ambiguous instructions; a denial should lead to a clarified new request. The loop and provider were not run against live Ollama or Foundry. Alternate ChatHandler paths outside ConversationEngine and direct registry callers are not constrained by this turn filter; L1 owns dormant orchestration paths. H7 remains pending.
 - Commit: the commit containing this entry and H6 code is titled “fix: constrain turn tool capabilities (H6)”.
+- Status: **Owner accepted** on 2026-09-27: “Accepted. Please continue.” Continuation was scoped to M5.
+
+### M5 implementation — 2026-09-27
+
+- Authorization: the owner accepted H6 and directed continuation. This authorizes M5 only.
+- Disposition: **Consolidate completion on a substantive assistant response**. After tool use, a plain text assistant answer now ends the turn immediately, is emitted once to the UI and saved once in conversation history. The same rule already applies to an initial no-tool answer. An empty response is still corrected with a bounded retry; `end_loop` remains available for explicit termination without text. The repeated text circuit breaker and instruction demanding `end_loop` after an answer were removed. The existing task tracker is closed on either exit path.
+- Evidence: integration tests drive a tool call through a text-only continuation and assert one provider continuation, one visible answer, one persisted answer, no corrective churn, and `assistant_response` terminal logging; a separate test covers empty continuation correction. A direct no-tool engine answer is tested. Regression 59/59, integration 16/16, security 24/24, component 1/1, policy and whitespace checks passed.
+- Limits: this accepts text as a final answer, even when the model merely describes an action it never called; R6 and M6 still own truthful recovery for narrated-but-unexecuted actions and failures. A live Ollama/Foundry UI session and persistence reload remain unverified. H7 remains pending.
+- Commit: the commit containing this entry and M5 code is titled “fix: complete tool turns on assistant answers (M5)”.
 - Status: **Awaiting owner acceptance**. No other finding was closed.
 
 ### Newly observed candidate — pack read permissions (investigate with separate authorization)

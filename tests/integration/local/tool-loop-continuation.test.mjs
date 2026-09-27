@@ -39,6 +39,7 @@ const { normalizeAIResponse } = await import('../../../scripts/utils/ai-normaliz
 // Terminal reasons the loop is contractually allowed to emit (#178).
 const KNOWN_REASONS = [
   'end_loop',
+  'assistant_response',
   'repeat_limit',
   'circuit_breaker',
   'tool_failure_fallback',
@@ -240,6 +241,34 @@ test('happy path: exactly one continuation per non-terminal result', async () =>
 
   assert.equal(onToolPendingLog.length, 5, 'pending event emitted for every tool call');
   assert.equal(loggedLoopEndedReason(entriesBefore), 'end_loop');
+});
+
+test('plain text after a tool ends the turn once and persists the final answer', async () => {
+  const { promise, counter, conversation, entriesBefore, onToolResultLog } = startLoop(
+    normalizeAIResponse(rawToolCall('call_read', 'read_document', { justification: 'Read the record' })),
+    [rawText('The actor has 12 hit points.')]
+  );
+  const result = await promise;
+  assert.equal(result._terminalReason, 'assistant_response');
+  assert.equal(result.content, 'The actor has 12 hit points.');
+  assert.equal(result._emitted, true);
+  assert.equal(counter.calls, 1);
+  assert.deepEqual(conversation.messages.filter(message => message.role === 'assistant' && message.content).map(message => message.content), ['The actor has 12 hit points.']);
+  assert.equal(conversation.messages.some(message => message.role === 'developer'), false);
+  assert.deepEqual(onToolResultLog.filter(message => message.role === 'assistant' && message.content).map(message => message.content), ['The actor has 12 hit points.']);
+  assert.equal(loggedLoopEndedReason(entriesBefore), 'assistant_response');
+});
+
+test('empty post-tool response is corrected, then a substantive answer ends the turn', async () => {
+  const { promise, counter, conversation } = startLoop(
+    normalizeAIResponse(rawToolCall('call_empty', 'read_document', { justification: 'Read the record' })),
+    [rawText(''), rawText('I found the answer.')]
+  );
+  const result = await promise;
+  assert.equal(result._terminalReason, 'assistant_response');
+  assert.equal(counter.calls, 2);
+  assert.equal(conversation.messages.filter(message => message.role === 'developer').length, 1);
+  assert.equal(conversation.messages.filter(message => message.role === 'assistant' && message.content === 'I found the answer.').length, 1);
 });
 
 test(
