@@ -82,7 +82,7 @@ test('update tool passes its selected pack to embedded execution', async t => {
   t.mock.method(DocumentAPI, 'getDocument', async () => packed);
   const observed = [];
   t.mock.method(DocumentAPI, 'applyEmbeddedOperations', async (...args) => observed.push(args));
-  documentReadRegistry.registerRead('Actor', 'shared', packed);
+  documentReadRegistry.registerRead('Actor', 'shared', packed, 'world.heroes');
   const result = await new DocumentUpdateTool().execute({
     documentType: 'Actor', documentId: 'shared', pack: 'world.heroes',
     operations: [{ action: 'insert', path: 'items', value: { name: 'Shield' } }],

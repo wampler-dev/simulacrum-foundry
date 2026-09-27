@@ -91,7 +91,7 @@ export class DocumentReadTool extends BaseTool {
 
       // Register that this document has been read (for read-before-modify enforcement)
       const data = typeof document?.toObject === 'function' ? document.toObject() : document;
-      documentReadRegistry.registerRead(documentType, documentId, data);
+      documentReadRegistry.registerRead(documentType, documentId, data, pack);
 
       const content = this._formatDocumentContent(document, documentId, parameters);
       const documentName = document?.name || documentId;

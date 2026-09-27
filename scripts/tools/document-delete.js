@@ -27,7 +27,7 @@ class DocumentDeleteTool extends BaseTool {
     }
     const currentData =
       typeof currentDoc?.toObject === 'function' ? currentDoc.toObject() : currentDoc;
-    documentReadRegistry.requireReadForModification(documentType, documentId, currentData);
+    documentReadRegistry.requireReadForModification(documentType, documentId, currentData, pack);
     return currentDoc;
   }
 
@@ -108,7 +108,7 @@ class DocumentDeleteTool extends BaseTool {
 
       const deleteOpts = params.pack ? { pack: params.pack } : {};
       await DocumentAPI.deleteDocument(params.documentType, params.documentId, deleteOpts);
-      documentReadRegistry.unregister(params.documentType, params.documentId);
+      documentReadRegistry.unregister(params.documentType, params.documentId, params.pack);
 
       return {
         content: `Deleted ${params.documentType}:${params.documentId}`,

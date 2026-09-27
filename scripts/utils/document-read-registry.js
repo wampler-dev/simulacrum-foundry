@@ -37,8 +37,8 @@ class DocumentReadRegistry {
    * @param {string} documentId - Document ID
    * @returns {string} Composite key
    */
-  _key(documentType, documentId) {
-    return `${documentType}:${documentId}`;
+  _key(documentType, documentId, pack) {
+    return JSON.stringify([pack ? 'pack' : 'world', pack || null, documentType, documentId]);
   }
 
   /**
@@ -58,8 +58,8 @@ class DocumentReadRegistry {
    * @param {Object} documentData - Document data at time of read
    * @returns {string} The computed hash
    */
-  registerRead(documentType, documentId, documentData) {
-    const key = this._key(documentType, documentId);
+  registerRead(documentType, documentId, documentData, pack) {
+    const key = this._key(documentType, documentId, pack);
     const hash = this._computeHash(documentData);
     this._registry.set(key, { hash, timestamp: Date.now() });
     logger.debug(`Registered read: ${key} (hash: ${hash})`);
@@ -72,8 +72,8 @@ class DocumentReadRegistry {
    * @param {string} documentId - Document ID
    * @returns {boolean} True if document has been read
    */
-  hasBeenRead(documentType, documentId) {
-    return this._registry.has(this._key(documentType, documentId));
+  hasBeenRead(documentType, documentId, pack) {
+    return this._registry.has(this._key(documentType, documentId, pack));
   }
 
   /**
@@ -82,8 +82,8 @@ class DocumentReadRegistry {
    * @param {string} documentId - Document ID
    * @returns {string|null} Stored hash or null if not read
    */
-  getStoredHash(documentType, documentId) {
-    const entry = this._registry.get(this._key(documentType, documentId));
+  getStoredHash(documentType, documentId, pack) {
+    const entry = this._registry.get(this._key(documentType, documentId, pack));
     return entry?.hash || null;
   }
 
@@ -98,8 +98,8 @@ class DocumentReadRegistry {
    * @param {Object} currentData - Current document data to compare against stored hash
    * @throws {Error} If modification should be rejected
    */
-  requireReadForModification(documentType, documentId, currentData) {
-    const key = this._key(documentType, documentId);
+  requireReadForModification(documentType, documentId, currentData, pack) {
+    const key = this._key(documentType, documentId, pack);
     const entry = this._registry.get(key);
 
     if (!entry) {
@@ -161,8 +161,8 @@ class DocumentReadRegistry {
    * @param {string} documentType - Document type
    * @param {string} documentId - Document ID
    */
-  unregister(documentType, documentId) {
-    const key = this._key(documentType, documentId);
+  unregister(documentType, documentId, pack) {
+    const key = this._key(documentType, documentId, pack);
     this._registry.delete(key);
     logger.debug(`Unregistered: ${key}`);
   }

@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, and H2 owner-accepted. H7 live validation is pending by owner direction. H3 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, H2, and H3 owner-accepted. H7 live validation is pending by owner direction. H4 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -330,4 +330,13 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: tests/regression/embedded-pack-target.test.mjs exercises tool-to-API pack handoff, same raw ID in world and pack, ordinary world behavior, missing pack, and mismatched document type. All three behavioral tests pass. Regression 36/36 plus compaction budget, integration 14/14, security 19/19, and policy passed.
 - Limits: mock documents prove routing and pre-mutation rejection, not actual Foundry v14 compendium writes or host permission behavior. H4 read-registry source identity remains open, including same-ID cross-source read prerequisites; H7 browser validation remains pending. Live mutation acceptance is still needed when a suitable installation is available.
 - Commit: the commit containing this entry and H3 code is titled “fix: retain pack target for embedded updates (H3)”.
+- Status: **Owner accepted** on 2026-09-27: “Accepted. Please continue.” The permission to continue was scoped to H4. H7 remains pending.
+
+### H4 implementation — 2026-09-27
+
+- Authorization: the owner accepted H3 and directed “Please continue.” This authorizes H4 only.
+- Disposition: **Small fix of existing registry contract**. The read registry now keys documents by world or pack source, pack ID, document type, and raw document ID. Read and create verification register the selected source; update and delete check the same source; successful update re-registers it, and successful delete unregisters only that source. The existing stale hash check remains.
+- Evidence: tests/regression/read-source-identity.test.mjs exercises world and two packs with identical raw ID and data, cross-source denial for update and delete, stale detection per source, and source-specific deletion. The prior H3 test was updated to register the pack read explicitly. Regression 38/38 plus compaction budget, integration 14/14, security 19/19, and policy passed; git whitespace check passed.
+- Limits: local mocks validate routing and prerequisites, not live Foundry v14 permission or pack mutation. M2 remains responsible for whether a paginated read gives sufficient evidence to count as a read; H7 live browser validation remains pending.
+- Commit: the commit containing this entry and H4 code is titled “fix: scope read prerequisites to document source (H4)”.
 - Status: **Awaiting owner acceptance**. No other finding was closed.

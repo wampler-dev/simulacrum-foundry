@@ -320,7 +320,8 @@ export class DocumentCreateTool extends BaseTool {
         documentReadRegistry.registerRead(
           documentType,
           fullDocument.id || fullDocument._id,
-          fullDocument
+          fullDocument,
+          parameters.pack
         );
       }
 
@@ -525,7 +526,8 @@ export class DocumentCreateTool extends BaseTool {
       documentReadRegistry.registerRead(
         parameters.documentType,
         fullDocument.id || fullDocument._id,
-        fullDocument
+        fullDocument,
+        parameters.pack
       );
     }
 

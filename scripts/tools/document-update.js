@@ -27,7 +27,7 @@ class DocumentUpdateTool extends BaseTool {
       throw error;
     }
     const currentData = currentDoc?.toObject?.() ?? currentDoc;
-    documentReadRegistry.requireReadForModification(documentType, documentId, currentData);
+    documentReadRegistry.requireReadForModification(documentType, documentId, currentData, pack);
   }
 
   constructor() {
@@ -345,7 +345,7 @@ class DocumentUpdateTool extends BaseTool {
     // Update the registry with the new document state so subsequent edits don't fail
     const data =
       typeof latestDocument?.toObject === 'function' ? latestDocument.toObject() : latestDocument;
-    documentReadRegistry.registerRead(params.documentType, params.documentId, data);
+    documentReadRegistry.registerRead(params.documentType, params.documentId, data, params.pack);
 
     return {
       content: JSON.stringify(
