@@ -503,6 +503,12 @@ No scope expansion and no new task without the owner's explicit permission.
 - Commit: the commit containing this entry and logging changes is titled “fix: bound interaction diagnostics (L5)”.
 - Status: **Owner accepted** on 2026-09-27: “Accepted, continue.” No independent remediation task remains in the ordered plan. H7 live validation, M10 runtime measurement, the pack read permission candidate, and final runtime acceptance remain pending; this acceptance does not close them or authorize a new task.
 
+### H7 live validation retry — 2026-09-27
+
+- Authorization: after the L5 acceptance, the owner directed “Accepted, continue.” This authorizes resuming the pending H7 live rendering validation; it does not authorize unrelated runtime investigations.
+- Attempt: the authorized cloud browser opened `https://foundry.wampler.app/join` and `https://foundry.wampler.app/`. Both displayed “Site Unavailable — Unable to access this site.” No Foundry login, world, module version, sidebar, or rendering surface was reachable from that browser.
+- Status: **Blocked; H7 remains open**. Obtain an accessible isolated Foundry v14 test world with the restart branch installed and test account access before testing malicious attributes/URLs in final, streaming, and tool output. This retry establishes no safety or exploitability result and does not establish whether the restart branch is installed at the host.
+
 ### Newly observed candidate — pack read permissions (investigate with separate authorization)
 
 - DocumentAPI.getDocument uses pack.getDocument(id) and returns its object without the module-level permission check used for world reads and pack search. It is uncertain whether Foundry v14 getDocument enforces the user’s pack/document read permission at this boundary. This was observed during M2 but no policy change was authorized or made.
