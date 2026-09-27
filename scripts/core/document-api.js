@@ -1473,14 +1473,18 @@ export class DocumentAPI {
    * @param {number} [params.maxResults=50]
    * @returns {Promise<object[]>} Result objects with minimal info
    */
-  static async searchDocuments({ types, query, fields = ['name'], pack } = {}) {
+  static async searchDocuments({ types, query, fields = ['name'], pack, maxResults = 50 } = {}) {
+    if (typeof query !== 'string' || !query.trim()) throw new Error('Search query must be non-empty; use list_documents to browse');
+    if (!Number.isInteger(maxResults) || maxResults < 1 || maxResults > 100) {
+      throw new Error('maxResults must be an integer from 1 to 100');
+    }
     // Normalize fields: null/empty from LLM tool calls should fall back to default
     if (!Array.isArray(fields) || fields.length === 0) {
       fields = ['name'];
     }
 
     const results = [];
-    const q = String(query || '').toLowerCase();
+    const q = query.trim().toLowerCase();
 
     // Helper to check match
     const isMatch = obj => {
@@ -1495,6 +1499,7 @@ export class DocumentAPI {
     if (pack) {
       const packObj = game.packs.get(pack);
       if (!packObj) throw new Error(`Unknown compendium pack: ${pack}`);
+      if (Array.isArray(types) && types.length && !types.includes(packObj.documentName)) return results;
       if (!packObj.testUserPermission(game.user, 'READ')) return results;
 
       const index = await packObj.getIndex({ fields });
@@ -1507,6 +1512,7 @@ export class DocumentAPI {
             pack: packObj.collection,
             uuid: idx.uuid,
           });
+          if (results.length >= maxResults) break;
         }
       }
       return results;
@@ -1542,6 +1548,7 @@ export class DocumentAPI {
           const obj = doc.toObject();
           if (isMatch(obj)) {
             results.push({ type: t, _id: obj._id, name: obj.name, uuid: doc.uuid });
+            if (results.length >= maxResults) return results;
           }
         }
       }
@@ -1565,6 +1572,7 @@ export class DocumentAPI {
               pack: p.collection,
               uuid: idx.uuid, // Index usually has uuid
             });
+            if (results.length >= maxResults) return results;
           }
         }
       }

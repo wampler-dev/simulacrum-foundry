@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, H2, H3, H4, M3, M4, M8, and M9 owner-accepted. H7 live validation is pending by owner direction. H5 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, M3, M4, M8, and M9 owner-accepted. H7 live validation is pending by owner direction. M1 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -384,6 +384,15 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: tests/regression/initial-compaction-outbound.test.mjs forces actual ConversationManager compaction, inspects the first outbound native-tool request, verifies removed messages are absent, the latest question remains, and the new summary appears once. It also checks explicitly supplied messages are not overwritten. Regression 50/50 plus compaction budget, integration 14/14, security 19/19, component 1/1, and policy passed; git whitespace check passed.
 - Limits: the local fake provider proves the request boundary; no live Ollama qwen3:14b context-size behavior or Foundry browser run occurred. M7 owns retention and large-output budgets. H7 remains pending.
 - Commit: the commit containing this entry and H5 code is titled “fix: send compacted history on initial request (H5)”.
+- Status: **Owner accepted** on 2026-09-27: “Excellent. What’s our overall progress so far? After reporting that, I accept and am willing to continue.” The progress report identified M1 as next; authorization was scoped to M1. H7 remains pending.
+
+### M1 implementation — 2026-09-27
+
+- Authorization: the owner accepted H5 and authorized continuation after a progress report. The progress report identified M1 as the next task. This authorizes M1 only.
+- Disposition: **Fix existing search contract**. Search names by default. Explicit fields use available indexed fields for compendium packs; no full compendium document text is claimed. An empty query rejects with a list_documents hint. maxResults is an integer from 1 to 100, defaults to 50, and caps the combined output across world and packs. A pack-restricted query respects documentTypes; the tool says “showing up to” at the limit and directs narrower queries rather than claiming a complete total. Existing source-qualified handoff remains.
+- Evidence: tests/regression/document-search-contract.test.mjs exercises world and two packs with duplicate IDs, explicit fields, pack/type selection, empty and unmatched queries, broad searches, and a limit that stops before indexing later packs. Regression 54/54 plus compaction budget, integration 14/14, security 19/19, component 1/1, and policy passed; git whitespace check passed.
+- Limits: pack index availability and search permissions are modeled locally, not proven against an installed Foundry v14/D&D5e pack. The bounded result set does not provide pagination or an exact total; use a narrower query. Large document reads remain M2; stored large outputs remain M7. H7 live browser validation remains pending.
+- Commit: the commit containing this entry and M1 code is titled “fix: align and bound document search (M1)”.
 - Status: **Awaiting owner acceptance**. No other finding was closed.
 
 ## Deterministic JavaScript opportunity register (tracking only)

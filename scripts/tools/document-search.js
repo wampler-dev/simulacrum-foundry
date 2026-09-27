@@ -12,14 +12,14 @@ class DocumentSearchTool extends BaseTool {
   constructor() {
     super(
       'search_documents',
-      'Search for documents by matching a text query against document names, content, and metadata fields. Use this when you have a specific search term — for browsing all documents of a type without a query, use `list_documents` instead. Searches across all document types by default; use `documentTypes` to restrict scope.',
+      'Search document names by default. Supply indexed field paths to search those fields where available; compendium search uses the pack index, not full document contents. Use list_documents to browse without a query. Searches world and compendiums by default.',
       {
         type: 'object',
         properties: {
           query: {
             type: 'string',
             description:
-              'The text to search for. Matches against document names, text content, and metadata fields (e.g., "goblin", "fire damage", "healing potion").',
+              'Non-empty text to match against names, or fields explicitly requested below.',
           },
           documentTypes: {
             type: 'array',
@@ -31,12 +31,16 @@ class DocumentSearchTool extends BaseTool {
             type: 'array',
             items: { type: 'string' },
             description:
-              'Restrict the search to specific document fields (e.g., ["name", "system.description.value"]). Omit to search all fields.',
+              'Field paths to search (e.g., ["name", "img"]). Omit to search names only. Compendium fields must be available in its index; full document text is not searched.',
           },
           pack: {
             type: 'string',
             description:
               'Restrict the search to a specific compendium pack (e.g., "dnd5e.monsters"). Omit to search the world and all packs.',
+          },
+          maxResults: {
+            type: 'integer', minimum: 1, maximum: 100,
+            description: 'Maximum results across all sources. Defaults to 50; at most 100. Narrow the query to find more.',
           },
         },
         required: ['query'],
@@ -60,7 +64,8 @@ class DocumentSearchTool extends BaseTool {
       });
 
       const resultCount = results.length;
-      const summary = `Found ${resultCount} document${resultCount !== 1 ? 's' : ''} matching "${params.query}"`;
+      const maxResults = params.maxResults ?? 50;
+      const summary = `${resultCount >= maxResults ? 'Showing up to' : 'Found'} ${resultCount} document${resultCount !== 1 ? 's' : ''} matching "${params.query}"${resultCount >= maxResults ? '; narrow the search for more' : ''}`;
       return {
         content: this.formatSearchResults(results, params.query),
         display: `<p><strong>${summary}</strong></p>`,
