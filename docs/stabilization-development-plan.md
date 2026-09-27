@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, and H1 owner-accepted. H7 mitigation awaits live validation and owner acceptance; the 2026-09-27 live check was blocked. Other tasks remain unauthorized.**
+Status: **Required scope; C1, C2, and H1 owner-accepted. H7 mitigation awaits live validation and owner acceptance; the restart branch is not installed on the authorized Foundry site. Other tasks remain unauthorized.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -288,3 +288,11 @@ No scope expansion and no new task without the owner's explicit permission.
 - No live validation results, new browser findings, or application code changes resulted from this attempt. H7 remains mitigated but **open**, and its previously recorded Node tests remain the only runtime evidence.
 - To finish this task, the owner must identify the exact authorized Foundry test URL/environment with the restart branch installed, or provide the licensed isolated test prerequisites through an approved route. Then verify real DOM behavior for final, restored, streaming, pending/result tool-card, and confirmation content, including hostile tags/event attributes/script URLs, plus legitimate markdown and Foundry links. Do not use a production world for destructive probes.
 - Status: **Blocked on an authorized live environment and browser access; awaiting owner acceptance after real validation**. The owner has not approved H7 closure or another task.
+
+### H7 authorized-site retry — 2026-09-27
+
+- The owner explicitly authorized access to Foundry.Wampler.app, resolving the prior uncertainty about the intended origin. A cloud-browser tab opened https://foundry.wampler.app/ without the earlier automatic approval rejection.
+- Browser observation: title “Site Unavailable” and text “Unable to access this site.” One reload returned the same page. This is not evidence of a Foundry response, a sign-in wall, or a security exploit. No Foundry UI, module version, DOMPurify availability, or message-rendering behavior could be inspected.
+- The owner subsequently confirmed that this branch is **not installed** on the site. Therefore the site cannot validate the H7 change even if cloud-browser access becomes available.
+- The isolated local Playwright prerequisites remain absent as recorded above. No code or runtime behavior changed during this retry.
+- Status: **H7 still open; live validation blocked by absence of the branch on the site and site unavailability in this cloud browser**. Install the branch in an authorized isolated Foundry v14 test environment or provide the isolated test prerequisites before repeating the check. No further browser route should be guessed, and no other remediation task was authorized by site-access approval.
