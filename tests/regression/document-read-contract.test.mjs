@@ -80,3 +80,19 @@ test('oversized full output fails with a field hint; selected reads remain bound
   const invalidPage = await tool.execute({ documentType: 'Actor', documentId: 'same', startLine: 50000 });
   assert.equal(invalidPage.error.type, 'UNKNOWN_ERROR');
 });
+
+test('published read examples validate and execute against matching world and pack fixtures', async t => {
+  setup(t);
+  const tool = new DocumentReadTool();
+  const examples = tool.getExamples();
+  assert.equal(examples.length, 3);
+  for (const example of examples) {
+    const parameters = { ...example.parameters, documentId: 'same' };
+    tool.validateParameters(parameters, tool.schema);
+    const result = await tool.execute(parameters);
+    assert.equal(result.error, undefined, `${example.description}: ${result.error?.message}`);
+    const data = payload(result);
+    if (parameters.pack) assert.equal(data.name, 'Goblin');
+    if (parameters.fields) assert.equal(data.fields['system.attributes.ac.value'], 15);
+  }
+});

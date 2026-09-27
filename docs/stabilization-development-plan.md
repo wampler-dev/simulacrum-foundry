@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, and L4 owner-accepted for implemented code. H7 live validation is pending by owner direction. The narrow M10 recovery fix is accepted, while its runtime assessment remains open pending measurement. L1 removal awaits owner acceptance. Work dependent on live validation waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, L1, and L4 owner-accepted for implemented code. H7 live validation is pending by owner direction. The narrow M10 recovery fix is accepted, while its runtime assessment remains open pending measurement. L2 implementation awaits owner acceptance. Work dependent on live validation waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -474,6 +474,15 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: repository-wide caller and initialization searches found only self-references for the deleted methods/classes. tests/integration/local/active-chat-path.test.mjs drives the supported adapter with one user message and verifies one engine request, one persisted answer, and one UI callback. Regression 65/65, integration 23/23, security 26/26, component 1/1, and policy passed; git whitespace check passed.
 - Limits: repository search cannot establish whether an untracked third-party module imports these internal files directly. No live Foundry sidebar or extension compatibility check occurred; H7 live validation remains pending. The module's exposed `SimulacrumCore.processMessage` contract remains in place.
 - Commit: the commit containing this entry and L1 removal is titled “refactor: remove dormant chat flows (L1)”.
+- Status: **Owner accepted** on 2026-09-27: “Accepted, continue.” Continuation was scoped to L2.
+
+### L2 implementation — 2026-09-27
+
+- Authorization: the owner accepted L1 and directed continuation. This authorizes L2 only.
+- Disposition: **Remove dead read preparation and fix public examples**. `DocumentReadTool.execute` uses `_formatDocumentContent` and `DocumentAPI.getDocument`; `prepareDocumentData` and recursive `processReferences` had no caller and were removed. `getExamples` now uses the required `documentId`, supported pack selection, and exact field paths; it no longer suggests reading by name or unsupported `withContent`.
+- Evidence: tests/regression/document-read-contract.test.mjs validates and executes each example with a matching world/pack Actor fixture, confirming the selected field value. Repository searches found no callers for the removed helpers. Regression 66/66, integration 23/23, security 26/26, component 1/1, and policy passed; git whitespace check passed.
+- Limits: example IDs and pack names are placeholders that users must replace with actual search results. Live Foundry v14/D&D5e execution remains pending with the broader H7 environment validation. No other DocumentAPI or schema behavior was changed.
+- Commit: the commit containing this entry and L2 code is titled “refactor: remove dead read helpers and fix examples (L2)”.
 - Status: **Awaiting owner acceptance**. No other finding was closed.
 
 ### Newly observed candidate — pack read permissions (investigate with separate authorization)

@@ -4,7 +4,6 @@
  */
 
 import { BaseTool } from './base-tool.js';
-import { createLogger } from '../utils/logger.js';
 import { documentReadRegistry } from '../utils/document-read-registry.js';
 
 /**
@@ -16,7 +15,6 @@ export class DocumentReadTool extends BaseTool {
       'read_document',
       'Read selected document fields or the document data without embedded collections by default. Set includeEmbedded=true to read embedded collections. Large results require narrower fields or line ranges. This read establishes the source-qualified prerequisite for update/delete.'
     );
-    this.logger = createLogger('DocumentReadTool');
     this.schema = {
       type: 'object',
       properties: {
@@ -203,102 +201,31 @@ export class DocumentReadTool extends BaseTool {
   }
 
   /**
-   * Prepare document data for response, respecting depth limits
-   * @param {Object} document - The original document
-   * @param {Array} fields - Specific fields to include
-   * @param {number} depth - Maximum depth for nested references
-   * @returns {Object} Processed document data
-   */
-  async prepareDocumentData(document, fields, depth) {
-    if (!document) return null;
-
-    let data = { ...document };
-
-    // If specific fields requested, filter to only those
-    if (fields && fields.length > 0) {
-      const filtered = {};
-      for (const field of fields) {
-        if (field in document) {
-          filtered[field] = document[field];
-        }
-      }
-      data = filtered;
-    }
-
-    // Handle depth-limited reference resolution
-    if (depth > 0) {
-      data = await this.processReferences(data, depth - 1);
-    }
-
-    return data;
-  }
-
-  /**
-   * Process document references recursively with depth limitation
-   * @param {Object} data - Document data to process
-   * @param {number} remainingDepth - Remaining depth for processing
-   * @returns {Object} Processed data with resolved references
-   */
-  async processReferences(data, remainingDepth) {
-    if (!data || remainingDepth < 0) return data;
-
-    // Handle case where data is an array of documents
-    if (Array.isArray(data)) {
-      return Promise.all(data.map(item => this.processReferences(item, remainingDepth)));
-    }
-
-    // Handle case where data is an object
-    if (typeof data === 'object') {
-      const processed = { ...data };
-
-      // Remove system-specific fields that might clutter response
-      const fieldsToRemove = ['_index', 'collection', '_createId', 'apps', '_sheet'];
-      fieldsToRemove.forEach(field => delete processed[field]);
-
-      // Process nested objects
-      for (const key in processed) {
-        if (processed[key] && typeof processed[key] === 'object') {
-          try {
-            processed[key] = await this.processReferences(processed[key], remainingDepth - 1);
-          } catch (error) {
-            this.logger.warn(`Error processing nested reference in field ${key}:`, error);
-            // Keep original reference if processing fails
-          }
-        }
-      }
-
-      return processed;
-    }
-
-    return data;
-  }
-
-  /**
    * Get example usage for this tool
    */
   getExamples() {
     return [
       {
-        description: 'Read a document by ID (example)',
+        description: 'Read a world Actor by its raw ID',
         parameters: {
-          documentType: 'SomeDocumentType',
-          id: 'DOCUMENT_ID_HERE',
+          documentType: 'Actor',
+          documentId: 'ACTOR_ID_HERE',
         },
       },
       {
-        description: 'Read a document by name (example)',
+        description: 'Read an Actor from a compendium pack',
         parameters: {
-          documentType: 'SomeDocumentType',
-          name: 'Exact Name',
+          documentType: 'Actor',
+          documentId: 'ACTOR_ID_HERE',
+          pack: 'world.monsters',
         },
       },
       {
-        description: 'Read a document with specific fields only (example)',
+        description: 'Read selected Actor fields',
         parameters: {
-          documentType: 'SomeDocumentType',
-          id: 'DOCUMENT_ID_HERE',
-          fields: ['name', 'type', 'img', 'system'],
-          withContent: true,
+          documentType: 'Actor',
+          documentId: 'ACTOR_ID_HERE',
+          fields: ['name', 'system.attributes.ac.value'],
         },
       },
     ];
