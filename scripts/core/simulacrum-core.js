@@ -230,6 +230,9 @@ class SimulacrumCore {
       let systemPrompt = options.systemPrompt || (await this.getSystemPrompt());
       const getSystemPromptFn = () => systemPrompt;
 
+      // Only replace the outbound array when it came from the managed conversation.
+      const managedHistory = this.conversationManager?.getMessages() === messages;
+
       // Trigger compaction if approaching token limit, looping until within budget
       if (this.conversationManager && this.aiClient) {
         systemPrompt = await this._compactHistoryIfNeeded(systemPrompt, useCustomPrompt, options);
@@ -237,7 +240,7 @@ class SimulacrumCore {
 
       // Legacy capping removed in favor of Tiered Context Compaction
       // const limitedMessages = smartSliceMessages(messages, contextLength);
-      const limitedMessages = messages;
+      const limitedMessages = managedHistory ? this.conversationManager.getMessages() : messages;
 
       // Get AI response - use legacy mode setting to determine tool support
       const legacyMode = game.settings.get('simulacrum', 'legacyMode');

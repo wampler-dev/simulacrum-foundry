@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, H2, H3, H4, M3, M4, and M8 owner-accepted. H7 live validation is pending by owner direction. M9 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, H2, H3, H4, M3, M4, M8, and M9 owner-accepted. H7 live validation is pending by owner direction. H5 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -375,6 +375,15 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: tests/regression/copy-move-identity.test.mjs checks actual ID (including quoted names), rejection before side effects, absence of a prose-only identity, missing ID, and locked source pack. The earlier H2 tests now check structured partial identity and uncertain create-phase failures. Regression 48/48 plus compaction budget, integration 14/14, security 19/19, component 1/1, and policy passed; git whitespace check passed.
 - Limits: cross-location move is still copy then delete and cannot be atomic through this tool. A reported failure can leave a copy and an uncertain source; the response instructs the user to inspect both before retrying. No automatic retry or rollback was added. Browser/Foundry v14 real document creation and deletion remain unverified, and H7 remains pending.
 - Commit: the commit containing this entry and M9 code is titled “fix: use real copy identity and constrain moves (M9)”.
+- Status: **Owner accepted** on 2026-09-27: “Please continue.” This was treated as acceptance of M9 and permission to work on H5. H7 remains pending.
+
+### H5 implementation — 2026-09-27
+
+- Authorization: the owner directed “Please continue” after reviewing M9. The next independent task was scoped as H5 in the progress update. This authorizes H5 only.
+- Disposition: **Small fix**. SimulacrumCore.generateResponse detects whether the supplied messages are the conversation manager’s current array before compaction. After compaction, the initial provider request rereads getMessages() if it came from that managed array; independently supplied message arrays retain their existing behavior. The rolling summary still enters through getSystemPrompt.
+- Evidence: tests/regression/initial-compaction-outbound.test.mjs forces actual ConversationManager compaction, inspects the first outbound native-tool request, verifies removed messages are absent, the latest question remains, and the new summary appears once. It also checks explicitly supplied messages are not overwritten. Regression 50/50 plus compaction budget, integration 14/14, security 19/19, component 1/1, and policy passed; git whitespace check passed.
+- Limits: the local fake provider proves the request boundary; no live Ollama qwen3:14b context-size behavior or Foundry browser run occurred. M7 owns retention and large-output budgets. H7 remains pending.
+- Commit: the commit containing this entry and H5 code is titled “fix: send compacted history on initial request (H5)”.
 - Status: **Awaiting owner acceptance**. No other finding was closed.
 
 ## Deterministic JavaScript opportunity register (tracking only)
