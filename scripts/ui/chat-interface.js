@@ -2,6 +2,7 @@ import { SimulacrumError } from '../utils/errors.js';
 import { ConversationCommands } from './conversation-commands.js';
 import { createLogger } from '../utils/logger.js';
 import { processMessageForDisplay } from './sidebar-state-syncer.js';
+import { sanitizeDisplayHtml } from '../utils/display-html.js';
 // Assuming SimulacrumCore will be the main entry point for AI processing
 // and will be defined later in simulacrum.js or a dedicated core file.
 // For now, we'll mock its existence or assume it's globally available in FoundryVTT context.
@@ -106,7 +107,7 @@ class ChatInterface {
 
     ChatMessage.create({
       user: user._id,
-      content: processedDisplay,
+      content: sanitizeDisplayHtml(processedDisplay),
       type: CONST.CHAT_MESSAGE_TYPES.OTHER,
       speaker: { alias: 'Simulacrum AI' }, // AI's speaker
       flags: { simulacrum: { aiGenerated: true } },

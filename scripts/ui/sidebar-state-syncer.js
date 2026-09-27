@@ -12,6 +12,7 @@ import {
 } from '../utils/message-utils.js';
 import { ChatHandler } from '../core/chat-handler.js';
 import { createLogger } from '../utils/logger.js';
+import { sanitizeDisplayHtml } from '../utils/display-html.js';
 
 const logger = createLogger('SidebarSync');
 const DISPLAY_ROLES = new Set(['user', 'assistant', 'tool']);
@@ -74,7 +75,7 @@ export async function processMessageForDisplay(content, _options = {}) {
  * @returns {Promise<object>} Formatted message object
  */
 export async function createDisplayMessage(role, content, display = null) {
-  const processedDisplay = display || (await processMessageForDisplay(content));
+  const processedDisplay = sanitizeDisplayHtml(display || (await processMessageForDisplay(content)));
 
   return {
     id: foundry.utils.randomID(),

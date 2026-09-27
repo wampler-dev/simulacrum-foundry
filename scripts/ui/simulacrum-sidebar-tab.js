@@ -18,6 +18,7 @@ import { formatPendingToolCall, formatToolCallDisplay } from '../utils/message-u
 import { emitProcessCancelled, SimulacrumHooks } from '../core/hook-manager.js';
 import { SequentialQueue } from '../utils/sequential-queue.js';
 import { SidebarMessageQueue } from './sidebar-message-queue.js';
+import { sanitizeDisplayHtml } from '../utils/display-html.js';
 
 // Stable base class resolution for FoundryVTT v13 with fallback safety
 const AbstractSidebarTab =
@@ -742,7 +743,7 @@ export class SimulacrumSidebarTab extends HandlebarsApplicationMixin(AbstractSid
   }
 
   async _addMessageImpl(role, content, display, noGroup) {
-    const processedDisplay = display || (await processMessageForDisplay(content));
+    const processedDisplay = sanitizeDisplayHtml(display || (await processMessageForDisplay(content)));
 
     if (this._tryMergeAssistantMessage(role, content, processedDisplay, noGroup)) return;
 
@@ -840,9 +841,7 @@ export class SimulacrumSidebarTab extends HandlebarsApplicationMixin(AbstractSid
   }
 
   _appendChunkToContent(contentEl, newContentChunk) {
-    const sanitized = globalThis.DOMPurify
-      ? globalThis.DOMPurify.sanitize(newContentChunk)
-      : newContentChunk;
+    const sanitized = sanitizeDisplayHtml(newContentChunk);
 
     const lastChild = contentEl.lastElementChild;
     const isTextBlock =
@@ -893,7 +892,7 @@ export class SimulacrumSidebarTab extends HandlebarsApplicationMixin(AbstractSid
         const wrapper = document.createElement('div');
         wrapper.className = 'content-block tool-card pending-tool-inline'; // Block Architecture
         wrapper.dataset.toolCallId = toolCallId;
-        wrapper.innerHTML = pendingHtml;
+        wrapper.innerHTML = sanitizeDisplayHtml(pendingHtml);
         lastAssistantContent.appendChild(wrapper);
 
         // Scroll to bottom
@@ -935,7 +934,7 @@ export class SimulacrumSidebarTab extends HandlebarsApplicationMixin(AbstractSid
         const wrapper = document.createElement('div');
         wrapper.className = 'content-block tool-card tool-result';
         wrapper.dataset.toolCallId = toolCallId; // Optional: track it
-        wrapper.innerHTML = html;
+        wrapper.innerHTML = sanitizeDisplayHtml(html);
         lastAssistantContent.appendChild(wrapper);
         this._scrollToBottom();
 

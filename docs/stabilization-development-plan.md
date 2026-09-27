@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1 and C2 resolved. H1 implementation awaiting owner acceptance. Other tasks remain unauthorized.**
+Status: **Required scope; C1, C2, and H1 owner-accepted. H7 mitigation awaiting live validation and owner acceptance. Other tasks remain unauthorized.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -265,4 +265,17 @@ No scope expansion and no new task without the owner's explicit permission.
 - Verification: security tier **16/16 passed**; local integration tier **14/14 passed**; policy tier passed; git whitespace check passed. Static tier could not complete in this checkout because the ESLint baseline tool received empty JSON output when development dependencies were not installed. No live Foundry v14/D&D5e confirmation dialog or copy/move document mutation was run.
 - Limits: H2 and M9 still cover copy/move error handling, partial moves, and result identity. H1 tests establish the dispatcher policy boundary, not correctness of those tool implementations or a live browser prompt.
 - Commit: the commit containing this entry and H1 change is titled “fix: require permission for document copy and move (H1)”.
-- Status: **Awaiting owner acceptance** after review. No other finding is marked resolved.
+- Implementation commit: [3296b39f6a2053f631d46e393eba82201ad0854e](https://github.com/wampler-dev/simulacrum-foundry/commit/3296b39f6a2053f631d46e393eba82201ad0854e).
+- Owner acceptance: on 2026-09-27, the owner stated “I approve. Please document and proceed.” following the H1 report.
+- Status: **Owner-accepted fix; live validation outstanding**. No other finding was closed by this acceptance.
+
+### H7 boundary mitigation — 2026-09-27
+
+- Authorization: the same owner message directed continued work after H1 acceptance. The plan's first stage calls for assessing H7 before moving to the next stage. Work was scoped to the UI trust boundary.
+- Confirmed path: MarkdownRenderer.render returns HTML-looking input unchanged by default. sidebar-state-syncer passes generated/enriched HTML into display strings; message.hbs inserts display with triple braces. The sidebar also inserts streamed text with insertAdjacentHTML/innerHTML and pending/result tool cards with innerHTML. Tool justifications and tool result content can be interpolated into those cards. The prior conditional DOMPurify call returned raw HTML when unavailable. The existing ValidationEngine sanitizer test does not exercise these sinks.
+- Disposition: **Small fix** via scripts/utils/display-html.js at the final display boundaries. Use the existing global DOMPurify when present; if unavailable or it throws, encode the content as text. Applied to new/restored messages, direct chat output, streamed chunks, and pending/result tool cards. MarkdownRenderer remains a formatter; the display boundary owns sanitization. Avoided applying the escaped fallback twice in the normal sidebar callback path.
+- Evidence: new tests/security/display-html-boundary.test.mjs checks raw markdown output against new/restored display handling, absent/throwing sanitizer fallback, and the actual sidebar methods passing output through sanitizer before message, streaming, and tool-card DOM sinks. The tests stub DOMPurify's sanitizer function; they do not establish the real DOMPurify behavior or Foundry's full rendering chain.
+- Verification: security tier **19/19 passed**, integration tier **14/14 passed**, component tier **1/1 passed**, policy tier passed, and git whitespace check passed. Static tier remains unavailable in this checkout without installed ESLint dependencies. No live Foundry browser test was run.
+- Remaining: verify DOMPurify availability and the actual browser DOM for final, restored, streaming, tool-card, and confirmation displays with hostile tags, event attributes, and script URLs. Confirm expected markdown, Foundry links, and legitimate tool display formatting survive. A missing sanitizer deliberately degrades rich HTML to escaped text. Do not mark H7 resolved until browser evidence and owner acceptance.
+- Commit: the commit containing this entry and the mitigation is titled “fix: sanitize sidebar display boundaries (H7)”.
+- Status: **Mitigated; awaiting live Foundry validation and owner acceptance**. No other finding was closed.
