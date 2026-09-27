@@ -9,7 +9,6 @@
 
 import { createLogger, isDebugEnabled } from '../utils/logger.js';
 import { toolRegistry } from './tool-registry.js';
-import { performPostToolVerification } from './tool-verification.js';
 import { repairToolCallArguments } from '../utils/ai-normalization.js';
 import { throwIfAborted } from '../utils/retry-helpers.js';
 import { toolPermissionManager, PermissionState } from './tool-permission-manager.js';
@@ -255,13 +254,6 @@ export async function executeToolCalls(toolCalls, context) {
         await conversationManager.save();
       }
 
-      if (isSuccess) {
-        try {
-          await performPostToolVerification(toolName, parsedArgs, result, onToolResult);
-        } catch (e) {
-          logger.warn(`Post-verification failed: ${toolName}`, e);
-        }
-      }
     } catch (err) {
       if (isDebugEnabled()) logger.debug(`Tool execution error caught: ${err.message}`);
       error = err;

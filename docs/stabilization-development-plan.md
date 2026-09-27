@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, H2, H3, and H4 owner-accepted. H7 live validation is pending by owner direction. M3 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, H2, H3, H4, and M3 owner-accepted. H7 live validation is pending by owner direction. M4 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -348,6 +348,15 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: tests/regression/search-read-identity.test.mjs passes world and pack search arguments directly to read with identical IDs, checks bare/linked compendium UUIDs, and confirms mismatch/embedded rejection before DocumentAPI.getDocument. Regression 40/40 plus compaction budget, integration 14/14, security 19/19, and policy passed.
 - Limits: UUID parsing supports top-level world references and the standard two-component pack ID forms observed in search results; embedded references require a separate explicit contract. Search semantics and result limits remain M1; read context sizing remains M2. The mock tests do not establish live Foundry v14 UUID coverage or permission behavior.
 - Commit: the commit containing this entry and M3 code is titled “fix: hand search identities directly to read (M3)”.
+- Status: **Owner accepted** on 2026-09-27: “Accepted, please continue.” The permission to continue was scoped to M4. H7 remains pending.
+
+### M4 implementation — 2026-09-27
+
+- Authorization: the owner accepted M3 and directed continuation. This authorizes M4 only; the JavaScript opportunity register remains tracking only.
+- Disposition: **Remove** scripts/core/tool-verification.js and its executor call. The generic verifier expected a conversation manager but received a callback, searched top-level result IDs while document tools return nested documents, passed `id` where read_document requires `documentId`, and swallowed errors. Create and update already fetch their selected source through DocumentAPI.getDocument after mutation and include the fetched document in their result. Removing the redundant call avoids a false claim or an extra model-visible tool result.
+- Evidence: tests/regression/no-generic-post-verification.test.mjs drives executor create/update result handling and checks that it emits one result per call without invoking a second read. Regression 41/41 plus compaction budget, integration 14/14, security 19/19, and policy passed; git whitespace check passed.
+- Limits: existing create/update readback is a fetch after write; it does not prove field-by-field persistence or atomicity. Live Foundry v14 behavior and partial mutation outcomes remain unverified. M8 owns the result envelope; M9 owns copy/move partial state. Do not imply stronger verification than the returned document supports. H7 remains pending.
+- Commit: the commit containing this entry and M4 code is titled “remove: redundant post-tool verification (M4)”.
 - Status: **Awaiting owner acceptance**. No other finding was closed.
 
 ## Deterministic JavaScript opportunity register (tracking only)
