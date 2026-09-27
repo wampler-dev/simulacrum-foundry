@@ -163,8 +163,8 @@ async function initializeForGMUser() {
     module.api = SimulacrumCore;
   }
 
-  // Initialize MacroToolManager with toolRegistry for integration
-  const macroToolManager = new MacroToolManager(toolRegistry);
+  // Preserve the macro-manager API while automatic discovery is disabled
+  const macroToolManager = new MacroToolManager();
   await macroToolManager.initialize();
 
   // Expose manager on module API

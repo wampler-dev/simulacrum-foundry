@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; implementation not yet authorized.**
+Status: **Required scope; C1 implementation awaiting owner acceptance. Other tasks remain unauthorized.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -229,3 +229,15 @@ For each authorized task, record:
 - Final status: open, in progress, awaiting owner acceptance, or resolved.
 
 No scope expansion and no new task without the owner's explicit permission.
+
+
+### C1 implementation — 2026-09-27
+
+- Authorization: owner said “Great, then let's start!” after adoption of this plan. Work was explicitly scoped in the response to the first task, C1; no blanket authorization was inferred.
+- Disposition: **Remove/disable** automatic macro-tool discovery. Deleted source evaluation, world/pack scanning, lifecycle discovery hooks, and the now-unused dynamic registration helpers. Kept a small inert manager API for existing module/permission UI consumers.
+- Behavior change: macros with a const tool configuration no longer become custom AI tools. Existing macro documents and the explicit execute_macro tool are unchanged. README now documents this and requires a Foundry reload to discard previous in-memory tools/hooks.
+- Evidence: two behavioral security tests ran against the original code and both failed, observing configuration expression execution for enabled and disabled macros in world/pack discovery. The same tests now pass with zero evaluations, macro executions, pack loads, registrations, or discovery hooks during initialization and refresh.
+- Verification: security tier 4/4 passed; local integration tier 14/14 passed; required-test policy and git diff whitespace checks passed. No live Foundry/D&D5e/Ollama acceptance was performed.
+- Commit: the commit containing this resolution entry and the C1 implementation (locate through git history for this document).
+- Remaining: C2's registration path was removed as a consequence of disabling discovery, but C2 is not declared resolved; its final disposition and any future restoration require separate owner authorization. No other finding is claimed fixed.
+- Status: **Awaiting owner acceptance**. The owner has not yet accepted removal of automatic custom-tool discovery as the C1 resolution. All other findings retain their prior status.

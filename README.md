@@ -108,39 +108,16 @@ Click the Simulacrum tab in the sidebar and start chatting. Examples:
 
 ### Custom Macro Tools
 
-You can create custom tools for Simulacrum by creating a standard Foundry VTT Macro. To expose a macro as a tool, add a `const tool` configuration object to your macro code:
+Automatic custom macro-tool discovery is disabled on this stabilization branch.
+The previous discovery mechanism evaluated JavaScript from macro source while
+reading configuration, before execution approval. Macros containing a `const tool`
+object are therefore no longer automatically registered as AI tools.
 
-```javascript
-// Tool Configuration - This tells Simulacrum how to use this macro
-const tool = {
-    name: "my_custom_tool",
-    description: "A description of what this tool does",
-    parameters: {
-        type: "object",
-        properties: {
-            parameterName: {
-                type: "string",
-                description: "Description of the parameter"
-            }
-        },
-        required: ["parameterName"]
-    },
-    enabled: true
-};
-
-// Your macro logic here
-// Access parameters via: this.args.parameterName
-const result = `Processed: ${this.args.parameterName}`;
-
-// Return a value to send output back to the AI
-return result;
-```
-
-**Important notes:**
-- A `response` parameter is automatically added to all macro-tools, allowing the AI to explain what it's doing to the user
-- **Return a value** from your macro to provide output to the AI (strings or objects work)
-- If you don't return anything, the AI sees "No output"
-- Simulacrum automatically discovers any macro with this configuration and makes it available to the AI
+Existing Foundry macros are not deleted or modified. The explicit `execute_macro`
+tool remains available under its existing permission controls. Reload Foundry after
+updating to discard any tools and hooks registered by the previous version.
+Restoring automatic discovery requires a separately authorized safe configuration
+and registration design; see [the stabilization plan](docs/stabilization-development-plan.md).
 
 ### JavaScript Execution
 For advanced users, Simulacrum can execute arbitrary JavaScript, enabling complex automation workflows.
