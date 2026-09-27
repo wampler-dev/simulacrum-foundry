@@ -90,6 +90,20 @@ export async function executeToolCalls(toolCalls, context) {
       // Log tool call before execution (must happen before any early-exit so rejections appear in logs)
       interactionLogger.logToolCall(toolName, parsedArgs, toolCall.id);
 
+      // Schemas guide a model; this turn-level boundary is authoritative even
+      // for hallucinated calls and legacy inline tool syntax.
+      if (context.allowedToolNames && !context.allowedToolNames.has(toolName)) {
+        result = { error: 'Tool is not available for this request', denied: true, toolName };
+        if (currentToolSupport === true) {
+          conversationManager.addMessage('tool', JSON.stringify(result), null, toolCall.id);
+          await conversationManager.save();
+        }
+        const resultObj = { toolCall, toolName, result, success: false, error: null };
+        results.push(resultObj);
+        if (onToolResult) await onToolResult({ role: 'tool', content: JSON.stringify(result), toolCallId: toolCall.id, toolName });
+        continue;
+      }
+
       // Warn if justification is missing — the AI-facing schema marks it required, but
       // models (especially smaller ones) may skip it. Log a warning but still execute.
       if (

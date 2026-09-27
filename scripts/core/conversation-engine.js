@@ -8,6 +8,7 @@
 import { SimulacrumCore } from './simulacrum-core.js';
 import { processToolCallLoop } from './tool-loop-handler.js';
 import { toolRegistry } from './tool-registry.js';
+import { getTurnToolSchemas } from './turn-capabilities.js';
 import { appendEmptyContentCorrection, appendToolFailureCorrection } from './correction.js';
 import {
   isToolCallFailure,
@@ -38,11 +39,13 @@ class ConversationEngine {
    */
   async processTurn(options = {}) {
     const { signal, onAssistantMessage, onToolResult } = options;
+    const { allowed, schemas: tools } = getTurnToolSchemas(this.conversationManager.getMessages(), toolRegistry);
 
     // Get initial assistant response
     let aiResponse = await SimulacrumCore.generateResponse(this.conversationManager.getMessages(), {
       signal,
       onAssistantMessage,
+      tools,
     });
 
     // Pre-tool correction loop (bounded) - handles parse errors and tool call failures
@@ -70,6 +73,7 @@ class ConversationEngine {
         }
         aiResponse = await SimulacrumCore.generateResponse(this.conversationManager.getMessages(), {
           signal,
+          tools,
         });
       } finally {
         emitProcessStatus('end', callId);
@@ -108,13 +112,13 @@ class ConversationEngine {
 
     // With tools: delegate to tool loop (let the loop emit assistant/tool updates)
     // Note: tool-loop-handler now handles adding assistant messages with tool_calls
-    const tools = toolRegistry.getToolSchemas();
     const legacyMode = game?.settings?.get('simulacrum', 'legacyMode') ?? false;
     const currentToolSupport = !legacyMode;
 
     const finalResponse = await processToolCallLoop({
       initialResponse: aiResponse,
       tools,
+      allowedToolNames: allowed,
       conversationManager: this.conversationManager,
       aiClient: SimulacrumCore.aiClient,
       getSystemPrompt: SimulacrumCore.getSystemPrompt.bind(SimulacrumCore),

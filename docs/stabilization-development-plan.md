@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, M1, M2, M3, M4, M8, and M9 owner-accepted for implemented code. H7 live validation is pending by owner direction. M7 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, M1, M2, M3, M4, M7, M8, and M9 owner-accepted for implemented code. H7 live validation is pending by owner direction. H6 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -411,6 +411,15 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: tests/regression/bounded-tool-output.test.mjs drives a 200000-character result through executor, conversation save/load, and read_tool_output; checks compact history/UI payloads, retained-size/truncation marker, character paging, eviction, and bounding of legacy saved entries. The M8 result-status tests still pass. Regression 59/59 plus compaction budget, integration 14/14, security 19/19, component 1/1, and policy passed; git whitespace check passed.
 - Limits: truncation loses the tail of a single over-limit result; the compact reference explicitly says to refine the original request. Legacy activeMessages and interaction diagnostic logs may still contain large older payloads; L5 owns diagnostics and H5 owns outgoing history compaction. No live browser persistence/reload measurement or actual Foundry flag-size validation occurred. H7 remains pending.
 - Commit: the commit containing this entry and M7 code is titled “fix: bound retained and displayed tool output (M7)”.
+- Status: **Owner accepted** on 2026-09-27: “Please continue. Accepted!” Continuation was scoped to H6.
+
+### H6 implementation — 2026-09-27
+
+- Authorization: the owner accepted M7 and directed continuation. This authorizes H6 only.
+- Disposition: **Small turn-scoped capability filter plus dispatcher check**. The engine computes the tool set once from the current user request, advertises only that set on initial calls and retries, and passes the same set to the autonomous loop. The executor denies calls outside the set, including unadvertised native and legacy inline calls. Ordinary requests receive search/list/read/output paging and loop termination. Explicit creation, modification, deletion, copy/move, ownership, and code requests add only their matching tool; schema, asset, and folder discovery are offered when relevant. Existing destructive permission checks remain in force.
+- Evidence: tests/security/turn-capabilities.test.mjs exercises offered schema filtering, read-only and explicit actions, native/inline dispatch denial, and retained schemas after a simulated history replacement and initial retry. Security 23/23, regression 59/59, integration 14/14, component 1/1, and policy passed; whitespace check passed.
+- Limits: short English request matching can underselect on unusual wording or compound tasks and may overselect on ambiguous instructions; a denial should lead to a clarified new request. The loop and provider were not run against live Ollama or Foundry. Alternate ChatHandler paths outside ConversationEngine and direct registry callers are not constrained by this turn filter; L1 owns dormant orchestration paths. H7 remains pending.
+- Commit: the commit containing this entry and H6 code is titled “fix: constrain turn tool capabilities (H6)”.
 - Status: **Awaiting owner acceptance**. No other finding was closed.
 
 ### Newly observed candidate — pack read permissions (investigate with separate authorization)
