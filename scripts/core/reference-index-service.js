@@ -149,6 +149,7 @@ export class ReferenceIndexService {
     return {
       name: record.name,
       uuid: record.uuid,
+      documentId: this._documentId(record),
       documentType: record.documentType,
       subtype: record.subtype,
       packId: record.packId,
@@ -159,6 +160,15 @@ export class ReferenceIndexService {
       tokenImg: record.tokenImg,
       score: record.score,
     };
+  }
+
+  _documentId(record) {
+    if (!record) return null;
+    const uuid = String(record.uuid ?? '');
+    if (!uuid) return null;
+    const parts = uuid.split('.');
+    if (parts[0] === 'Compendium' && parts.length >= 4) return parts.at(-1) || null;
+    return parts.at(-1) || null;
   }
 
   /**
