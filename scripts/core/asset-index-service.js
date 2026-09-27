@@ -107,7 +107,7 @@ class AssetIndexService {
       });
 
       if (!hasEverIndexed) {
-        this.logger.debug('No persisted index flag found - first index not started yet');
+        this.logger.debug('No completed persisted index found');
         return false;
       }
 
@@ -119,9 +119,10 @@ class AssetIndexService {
         request.onerror = () => reject(request.error);
       });
 
-      if (storedTime) {
-        this.lastIndexTime = new Date(storedTime);
-      }
+      // A rebuild clears this timestamp before streaming records. A missing
+      // timestamp means the cache may contain only a partially traversed tree.
+      if (!Number.isFinite(storedTime) || storedTime <= 0) return false;
+      this.lastIndexTime = new Date(storedTime);
 
       // Count cached records so availability can reflect the existing index state.
       const counts = await new Promise((resolve, reject) => {
@@ -319,14 +320,6 @@ class AssetIndexService {
     // Clear stores before streaming new data
     if (this.db) {
       try {
-        if (isInitialIndex) {
-          await new Promise((resolve, reject) => {
-            const tx = this.db.transaction('meta', 'readwrite');
-            tx.objectStore('meta').put({ key: 'hasEverIndexed', value: true });
-            tx.oncomplete = resolve;
-            tx.onerror = () => reject(tx.error);
-          });
-        }
         await this._clearStores();
       } catch (err) {
         this.logger.error('Failed to clear IndexedDB stores', err);
@@ -398,6 +391,7 @@ class AssetIndexService {
     await new Promise((resolve, reject) => {
       const tx = this.db.transaction('meta', 'readwrite');
       tx.objectStore('meta').put({ key: 'lastIndexTime', value: timestamp.getTime() });
+      tx.objectStore('meta').put({ key: 'hasEverIndexed', value: true });
       tx.oncomplete = resolve;
       tx.onerror = () => reject(tx.error);
     });
@@ -412,6 +406,7 @@ class AssetIndexService {
       tx.objectStore('files').clear();
       tx.objectStore('folders').clear();
       tx.objectStore('meta').delete('lastIndexTime');
+      tx.objectStore('meta').delete('hasEverIndexed');
       tx.oncomplete = resolve;
       tx.onerror = () => reject(tx.error);
     });

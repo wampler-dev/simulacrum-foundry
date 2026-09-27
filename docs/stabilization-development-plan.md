@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, and M11 owner-accepted for implemented code. H7 live validation is pending by owner direction. L4 implementation and operational budget await owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, M11, and L4 owner-accepted for implemented code. H7 live validation is pending by owner direction. M10 has a narrow recovery fix awaiting owner acceptance; its runtime assessment remains open pending measurement. Work dependent on live validation waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -456,7 +456,16 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: integration tests cover successful tool calls exhausting a two-step budget, failed calls, a saved zero setting exhausting after the finite default, invalid/oversized setting normalization, and cancellation. Regression 62/62, integration 22/22, security 26/26, component 1/1, and policy passed; git whitespace check passed.
 - Limits: 12/20 is a conservative operational budget pending owner acceptance and live workload measurements. Each provider request retains its separately configured timeout and retry budget; this is a step count, not a wall-clock deadline. Previously saved settings above 20 may still display their old configured number in Foundry's settings UI, while runtime caps them; the hint explains the cap. H7 live validation remains pending.
 - Commit: the commit containing this entry and L4 code is titled “fix: bound autonomous tool steps (L4)”.
-- Status: **Awaiting owner acceptance**, including the 12-step default and 20-step ceiling. No other finding was closed.
+- Status: **Owner accepted**, including the 12-step default and 20-step ceiling, on 2026-09-27: “Accepted. Please continue.” Continuation was scoped to M10.
+
+### M10 recovery fix and investigation — 2026-09-27
+
+- Authorization: the owner accepted L4 and directed continuation. This authorizes M10 investigation and a narrowly evidenced recovery fix only.
+- Disposition: **Small fix to interrupted-rebuild cache recognition; leave the larger indexing design open**. A rebuild previously set `hasEverIndexed` before traversal, then cleared the completion timestamp and streamed partial records. Reload treated the flag alone as a complete cache. Cache reuse now requires a valid completion timestamp; rebuild clears the flag and timestamp before streaming and writes both only after traversal finishes. An interrupted rebuild will be retried after reload.
+- Evidence: tests/regression/asset-index-recovery.test.mjs simulates old interrupted metadata, invalidation before writes, completion metadata, and restoring completed counts. Regression 65/65, integration 22/22, security 26/26, component 1/1, and policy passed; git whitespace check passed. This is a local IndexedDB test double, not a measured Foundry/browser run.
+- Remaining M10 assessment: the service scans six roots at startup and every five minutes, makes full IndexedDB cursor passes for substring search, and globally wraps FilePicker upload/createDirectory. Successful repeated uploads increment counters even when replacing an existing path; source identity is inferred from path prefixes, so equal path strings across data/public sources may collide. Recursive browse errors are silently skipped and a rebuild can be marked complete despite missing subtrees. Assess actual relevance and latency before changing these mechanisms. Needed live evidence: representative ~15931-file index duration and search latency, normal and repeated upload behavior, interrupted rebuild/reload, stale/external changes, and source-separated paths in the supported Foundry environment. Do not claim a full M10 closure from the metadata test alone.
+- Commit: the commit containing this entry and M10 recovery code is titled “fix: reject interrupted asset index cache (M10)”.
+- Status: **Narrow fix awaiting owner acceptance; M10 investigation remains open** pending live measurement. H7 and work dependent on the live environment remain pending.
 
 ### Newly observed candidate — pack read permissions (investigate with separate authorization)
 
