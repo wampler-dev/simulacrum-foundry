@@ -149,6 +149,7 @@ class ConversationEngine {
         _terminalReason: finalResponse._terminalReason || 'repeat_limit',
       };
       this.conversationManager.addMessage('assistant', limitMessage.content);
+      await this.conversationManager.save();
       if (onAssistantMessage) {
         await onAssistantMessage(limitMessage);
       }

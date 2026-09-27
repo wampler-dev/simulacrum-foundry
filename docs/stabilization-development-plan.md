@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, and M9 owner-accepted for implemented code. H7 live validation is pending by owner direction. M11 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, M9, and M11 owner-accepted for implemented code. H7 live validation is pending by owner direction. L4 implementation and operational budget await owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -447,7 +447,16 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: tests/regression/scoped-system-prompt.test.mjs inspects actual native and legacy outbound requests, including forced compaction, and verifies the legacy prompt has only the selected schema while native prompt has no schema dump. The native builder test would fail if it enumerated macros. Regression 62/62, integration 19/19, security 26/26, component 1/1, and policy passed; git whitespace check passed.
 - Limits: the user-defined custom prompt can still mention unavailable tools, and legacy inline parsing remains dependent on model compliance; the dispatcher enforces the turn scope. Old localization strings remain in en.json but are no longer referenced by the active builder; removing those unused keys would offer little runtime benefit. No live Ollama/Foundry prompt or context measurement occurred. H7 remains pending.
 - Commit: the commit containing this entry and M11 code is titled “fix: scope system prompt to active capabilities (M11)”.
-- Status: **Awaiting owner acceptance**. No other finding was closed.
+- Status: **Owner accepted** on 2026-09-27: “Accept, go forward please.” Continuation was scoped to L4.
+
+### L4 implementation — 2026-09-27
+
+- Authorization: the owner accepted M11 and directed continuation. This authorizes L4 only.
+- Disposition: **Bound the existing loop**. The default is 12 total assistant loop steps per turn, with an effective maximum of 20. A saved 0, negative, fractional, or missing setting uses the finite default; an older value above 20 is capped at 20. The world setting describes these rules. Every assistant loop iteration now consumes a step, including successful tool calls. The last allowed step can complete, but cannot initiate another provider continuation. Exhaustion returns the existing visible terminal status and persists it in conversation history without inventing an unmatched tool-result message. Cancellation remains immediate.
+- Evidence: integration tests cover successful tool calls exhausting a two-step budget, failed calls, a saved zero setting exhausting after the finite default, invalid/oversized setting normalization, and cancellation. Regression 62/62, integration 22/22, security 26/26, component 1/1, and policy passed; git whitespace check passed.
+- Limits: 12/20 is a conservative operational budget pending owner acceptance and live workload measurements. Each provider request retains its separately configured timeout and retry budget; this is a step count, not a wall-clock deadline. Previously saved settings above 20 may still display their old configured number in Foundry's settings UI, while runtime caps them; the hint explains the cap. H7 live validation remains pending.
+- Commit: the commit containing this entry and L4 code is titled “fix: bound autonomous tool steps (L4)”.
+- Status: **Awaiting owner acceptance**, including the 12-step default and 20-step ceiling. No other finding was closed.
 
 ### Newly observed candidate — pack read permissions (investigate with separate authorization)
 

@@ -28,7 +28,7 @@ globalThis.FormApplication = class {
 globalThis.ui = { notifications: { error: () => {} } };
 globalThis.CONFIG = { debug: {} };
 
-const { processToolCallLoop } = await import('../../../scripts/core/tool-loop-handler.js');
+const { processToolCallLoop, getToolStepLimit, DEFAULT_TOOL_STEP_LIMIT, MAX_TOOL_STEP_LIMIT } = await import('../../../scripts/core/tool-loop-handler.js');
 const { toolRegistry } = await import('../../../scripts/core/tool-registry.js');
 const { interactionLogger } = await import('../../../scripts/core/interaction-logger.js');
 const { COMPACTION_STATUS } = await import('../../../scripts/core/conversation.js');
@@ -462,5 +462,46 @@ test('terminal reason coverage: exercised reasons are all in the known set', asy
     'cancelled',
   ]) {
     assert.ok(KNOWN_REASONS.includes(reason), `${reason} must be known`);
+  }
+});
+
+test('step budget bounds valid tool calls and does not add an unmatched tool result', async () => {
+  const originalGet = globalThis.game.settings.get;
+  globalThis.game.settings.get = (scope, key) => key === 'toolLoopLimit' ? 2 : originalGet(scope, key);
+  try {
+    const { promise, counter, conversation } = startLoop(
+      normalizeAIResponse(rawToolCall('step_1', 'list_documents', { justification: 'List' })),
+      [rawToolCall('step_2', 'list_documents', { justification: 'List again' }), rawText('Never sent')]
+    );
+    const result = await promise;
+    assert.equal(result._terminalReason, 'repeat_limit');
+    assert.equal(counter.calls, 1);
+    assert.deepEqual(conversation.messages.filter(message => message.role === 'tool').map(message => message.tool_call_id), ['step_1', 'step_2']);
+  } finally {
+    globalThis.game.settings.get = originalGet;
+  }
+});
+
+test('old unlimited and oversized settings receive a finite budget', () => {
+  assert.equal(getToolStepLimit(undefined), DEFAULT_TOOL_STEP_LIMIT);
+  assert.equal(getToolStepLimit(0), DEFAULT_TOOL_STEP_LIMIT);
+  assert.equal(getToolStepLimit(-1), DEFAULT_TOOL_STEP_LIMIT);
+  assert.equal(getToolStepLimit(100), MAX_TOOL_STEP_LIMIT);
+  assert.equal(getToolStepLimit(2), 2);
+});
+
+test('a saved zero limit no longer permits an unbounded tool loop', async () => {
+  const originalGet = globalThis.game.settings.get;
+  globalThis.game.settings.get = (scope, key) => key === 'toolLoopLimit' ? 0 : originalGet(scope, key);
+  try {
+    const { promise, counter } = startLoop(
+      normalizeAIResponse(rawToolCall('initial', 'list_documents', { justification: 'List' })),
+      [rawToolCall('again', 'list_documents', { justification: 'List' })]
+    );
+    const result = await promise;
+    assert.equal(result._terminalReason, 'repeat_limit');
+    assert.equal(counter.calls, DEFAULT_TOOL_STEP_LIMIT - 1);
+  } finally {
+    globalThis.game.settings.get = originalGet;
   }
 });

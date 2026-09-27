@@ -32,6 +32,14 @@ export { retrieveToolJustification } from './tool-execution.js';
 const logger = createLogger('ToolLoop');
 const MAX_TOOL_FAILURE_ATTEMPTS = 3;
 const TOOL_RETRY_STATUS_PREFIX = 'tool-retry';
+export const DEFAULT_TOOL_STEP_LIMIT = 12;
+export const MAX_TOOL_STEP_LIMIT = 20;
+
+export function getToolStepLimit(configured) {
+  return Number.isInteger(configured) && configured > 0
+    ? Math.min(configured, MAX_TOOL_STEP_LIMIT)
+    : DEFAULT_TOOL_STEP_LIMIT;
+}
 
 /**
  * Execute tools from an AI response and continue autonomous loop
@@ -91,19 +99,18 @@ function _classifyLoopError(error) {
 async function _runLoopIteration(context) {
   let currentResponse = context.initialResponse;
 
-  // Get limit from settings (default 100). -1 or 0 means infinite.
-  const configuredLimit = game?.settings?.get('simulacrum', 'toolLoopLimit') ?? 100;
-  const isInfinite = configuredLimit <= 0;
-  const REPEAT_LIMIT = isInfinite ? Number.MAX_SAFE_INTEGER : configuredLimit;
+  const STEP_LIMIT = getToolStepLimit(game?.settings?.get('simulacrum', 'toolLoopLimit'));
 
+  let stepCount = 0;
   let repeatCount = 0;
   let toolFailureAttempts = 0;
 
   let terminalReason = 'unknown';
 
-  while (repeatCount < REPEAT_LIMIT) {
+  while (stepCount < STEP_LIMIT) {
+    stepCount++;
     interactionLogger.logLoopEvent(context.loopId, 'loop_iteration_advanced', {
-      repeatCount,
+      stepCount,
     });
 
     if (context.signal?.aborted) throw new Error('Process was cancelled');
@@ -183,7 +190,8 @@ async function _runLoopIteration(context) {
     const cycleResult = await _processLoopCycle(currentResponse, context, {
       toolFailureAttempts,
       repeatCount,
-      REPEAT_LIMIT,
+      STEP_LIMIT,
+      atLimit: stepCount >= STEP_LIMIT,
     });
 
     // Handle cycle outcome
@@ -203,8 +211,8 @@ async function _runLoopIteration(context) {
   }
 
   // Handle Repeat Limit if loop finished naturally without break
-  if (repeatCount >= REPEAT_LIMIT) {
-    const value = _handleRepeatLimit(context, currentResponse, repeatCount, REPEAT_LIMIT);
+  if (stepCount >= STEP_LIMIT || terminalReason === 'repeat_limit') {
+    const value = _handleRepeatLimit(stepCount, STEP_LIMIT);
     value._terminalReason = 'repeat_limit';
     return value;
   }
@@ -220,12 +228,13 @@ async function _runLoopIteration(context) {
 // eslint-disable-next-line max-lines-per-function -- Refactor tracked in #147
 async function _processLoopCycle(currentResponse, context, state) {
   let { toolFailureAttempts, repeatCount } = state; // eslint-disable-line prefer-const
-  const { REPEAT_LIMIT } = state;
+  const { STEP_LIMIT, atLimit } = state;
 
   // 1. Handle Parse Errors
   if (currentResponse._parseError) {
+    if (atLimit) return { action: 'break', reason: 'repeat_limit' };
     repeatCount++;
-    const response = await _handleParseError(currentResponse, context, repeatCount, REPEAT_LIMIT);
+    const response = await _handleParseError(currentResponse, context, repeatCount, STEP_LIMIT);
     return { action: 'continue', response, repeatCount, toolFailureAttempts };
   }
 
@@ -235,6 +244,7 @@ async function _processLoopCycle(currentResponse, context, state) {
     if (toolFailureAttempts >= MAX_TOOL_FAILURE_ATTEMPTS) {
       return { action: 'return', value: toolFailureMessage('tool_call_failure'), reason: 'tool_call_failure' };
     }
+    if (atLimit) return { action: 'break', reason: 'repeat_limit' };
     const response = await _handleToolRefusal(currentResponse, context, toolFailureAttempts);
     return { action: 'continue', response, repeatCount, toolFailureAttempts };
   }
@@ -254,7 +264,7 @@ async function _processLoopCycle(currentResponse, context, state) {
       return { action: 'return', value: currentResponse, reason: 'assistant_response' };
     }
     repeatCount++;
-    if (repeatCount >= REPEAT_LIMIT) return { action: 'break', reason: 'repeat_limit' };
+    if (atLimit) return { action: 'break', reason: 'repeat_limit' };
     appendEmptyContentCorrection(context.conversationManager, currentResponse);
     interactionLogger.logLoopEvent(context.loopId, 'continuation_requested', {
       reason: 'empty_response_correction',
@@ -335,7 +345,7 @@ async function _processLoopCycle(currentResponse, context, state) {
   // 5. Handle Execution Failures
   if (toolResults.some(r => !r.success)) {
     repeatCount++;
-    _logToolFailures(toolResults, repeatCount, REPEAT_LIMIT);
+    _logToolFailures(toolResults, repeatCount, STEP_LIMIT);
   }
 
   // 5.5 Check for end_loop tool - terminate the loop
@@ -361,6 +371,8 @@ async function _processLoopCycle(currentResponse, context, state) {
   if (context.currentToolSupport !== true && toolResults.length > 0) {
     _notifyLegacyToolResults(toolResults, context);
   }
+
+  if (atLimit) return { action: 'break', reason: 'repeat_limit' };
 
   // 7. The AI client owns transport retries; do not multiply attempts here.
   interactionLogger.logLoopEvent(context.loopId, 'continuation_requested', {
@@ -684,16 +696,9 @@ function _logToolFailures(toolResults, retryCount, limit) {
   }
 }
 
-function _handleRepeatLimit(context, response, count, limit) {
+function _handleRepeatLimit(count, limit) {
   // Log error (use logger not console)
-  logger.error(`Repeat limit reached after ${limit} retries`, { count });
-
-  const msg = 'Tool execution limit reached.';
-  if (context.currentToolSupport === true) {
-    context.conversationManager.addMessage('tool', msg, null, 'tool_limit_error');
-  } else {
-    context.conversationManager.addMessage('system', msg);
-  }
+  logger.warn(`Tool step limit reached after ${limit} steps`, { count });
   return {
     content: '',
     display: null,

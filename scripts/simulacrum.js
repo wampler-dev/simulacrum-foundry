@@ -279,11 +279,14 @@ function registerAPISettings() {
 
   game.settings.register(MODULE_ID, 'toolLoopLimit', {
     name: 'Autonomous Tool Loop Limit',
-    hint: 'Maximum number of consecutive tool steps the AI can take autonomously. Set to 0 for infinite (no limit). Default is 100.',
+    hint: 'Maximum autonomous tool steps in one turn. Default is 12; values above 20 are capped at 20, and 0 or invalid values use the default.',
     scope: 'world',
     config: true,
     type: Number,
-    default: 100,
+    default: 12,
+    minimum: 1,
+    maximum: 20,
+    step: 1,
     restricted: true,
   });
 
