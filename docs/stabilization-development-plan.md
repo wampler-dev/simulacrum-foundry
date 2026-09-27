@@ -295,4 +295,10 @@ No scope expansion and no new task without the owner's explicit permission.
 - Browser observation: title “Site Unavailable” and text “Unable to access this site.” One reload returned the same page. This is not evidence of a Foundry response, a sign-in wall, or a security exploit. No Foundry UI, module version, DOMPurify availability, or message-rendering behavior could be inspected.
 - The owner subsequently confirmed that this branch is **not installed** on the site. Therefore the site cannot validate the H7 change even if cloud-browser access becomes available.
 - The isolated local Playwright prerequisites remain absent as recorded above. No code or runtime behavior changed during this retry.
-- Status: **H7 still open; live validation blocked by absence of the branch on the site and site unavailability in this cloud browser**. Install the branch in an authorized isolated Foundry v14 test environment or provide the isolated test prerequisites before repeating the check. No further browser route should be guessed, and no other remediation task was authorized by site-access approval.
+- Status: **H7 still open; live validation blocked by absence of the branch on the site and lack of access from this cloud browser**. Install the branch in an authorized isolated Foundry v14 test environment or provide the isolated test prerequisites before repeating the check. No other remediation task was authorized by site-access approval.
+
+### H7 site-access clarification — 2026-09-27
+
+- The owner supplied a phone screenshot showing the Foundry join page at foundry.wampler.app, including a “Server connection re-established” notice. The site is reachable from the owner's phone; the cloud-browser “Site Unavailable” result does **not** establish a general outage.
+- The owner supplied the exact https://foundry.wampler.app/join URL. The cloud browser navigated directly to that route and still displayed “Site Unavailable” / “Unable to access this site.” This is specific to that browser/environment. No Foundry UI was inspected through it.
+- The owner separately confirmed the restart branch is not installed there. A successful join-page visit would still not validate the H7 implementation. H7 remains open; no further route probing, login, production-world injection, or installation was performed.
