@@ -4,7 +4,7 @@ export class DocumentCopyTool extends BaseTool {
   constructor() {
     super(
       'document_copy',
-      'Create a duplicate of a document in a target location (world, folder, compendium, or embedded parent).',
+      'Create a duplicate of a document in the world, a world folder, or a compendium. Embedded sources can be copied; embedded destinations are unsupported.',
       DocumentCopyTool._buildSchema(),
       true, // requires confirmation
       true  // requires response
@@ -71,28 +71,44 @@ export class DocumentCopyTool extends BaseTool {
     }
 
     const { documentType, sourceId, sourceLocation, targetLocation, newName } = args;
+    let createAttempted = false;
 
     try {
+      if (targetLocation?.type === 'embedded') {
+        return this.handleError('Embedded destinations are unsupported: created document identity is unavailable.', 'UNSUPPORTED_TARGET');
+      }
       const sourceData = await this._resolveSource(documentType, sourceId, sourceLocation);
       if (!sourceData) {
         return this.handleError(`Source document not found: ${sourceId}`, 'NotFoundError');
       }
 
       const cloneData = this._prepareClone(sourceData, newName, targetLocation);
-      
+      createAttempted = true;
       const { createdDoc, targetDesc } = await this._createTarget(
         documentType, 
         cloneData, 
         targetLocation
       );
 
-      return this.createSuccessResponse(
-        `{ "message": "Successfully copied ${documentType} to ${targetDesc}", ` +
-        `"newId": "${createdDoc._id}", "name": "${createdDoc.name}" }`,
-        `<p>Copied <strong>${createdDoc.name}</strong> to <em>${targetDesc}</em></p>`
-      );
+      const newId = createdDoc?.id || createdDoc?._id;
+      if (!newId) {
+        const failure = this.handleError('Copy may have completed, but the destination returned no document ID. Check the destination before retrying.', 'UNKNOWN_DESTINATION');
+        failure.partial = { copyCompleted: true, destination: targetLocation, sourceState: 'unchanged' };
+        return failure;
+      }
+      return {
+        ...this.createSuccessResponse(
+          JSON.stringify({ message: `Successfully copied ${documentType} to ${targetDesc}`, newId, name: createdDoc.name, destination: targetLocation }),
+          `<p>Copied <strong>${createdDoc.name || newId}</strong> to <em>${targetDesc}</em></p>`
+        ),
+        document: { id: newId, name: createdDoc.name, documentType, destination: targetLocation },
+      };
     } catch (e) {
-      return this.handleError(`Copy failed: ${e.message}`, e.constructor.name);
+      const failure = this.handleError(`Copy failed: ${e.message}`, e.constructor.name);
+      if (createAttempted) {
+        failure.partial = { destination: targetLocation, destinationState: 'unknown', sourceState: 'unchanged' };
+      }
+      return failure;
     }
   }
 
@@ -149,20 +165,6 @@ export class DocumentCopyTool extends BaseTool {
       });
       return { createdDoc: created.toObject(), targetDesc: `Compendium (${location.pack})` };
     } 
-    
-    if (location.type === 'embedded') {
-      if (!location.parentId || !location.parentType) {
-        throw new Error('targetLocation parentId and parentType required');
-      }
-      await this.documentAPI.applyEmbeddedOperations(location.parentType, location.parentId, [{
-         embeddedName: documentType,
-         action: 'insert',
-         data: cloneData
-      }]);
-      const targetDesc = `Embedded (${location.parentType}: ${location.parentId})`;
-      const createdDoc = { name: cloneData.name, _id: "embedded_copied", ...cloneData };
-      return { createdDoc, targetDesc };
-    }
     
     throw new Error(`Unknown target location type: ${location.type}`);
   }

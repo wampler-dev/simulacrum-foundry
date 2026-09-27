@@ -33,6 +33,8 @@ test('copy returns original creation failure without masking it', async t => {
   const result = await tool.execute({ ...args, targetLocation: { type: 'world' } });
   assert.match(result.error.message, /Copy failed: write refused/);
   assert.doesNotMatch(result.error.message, /createErrorResponse|not a function/);
+  assert.equal(result.partial.destinationState, 'unknown');
+  assert.equal(result.partial.sourceState, 'unchanged');
 });
 
 test('move preserves copy failure and never deletes source', async t => {
@@ -51,7 +53,8 @@ test('move reports a successful copy and uncertain source after deletion fails',
   let copies = 0;
   t.mock.method(toolRegistry, 'getTool', () => ({ execute: async () => {
     copies++;
-    return { content: '{"newId":"copy-1","name":"Hero"}', display: 'Copied' };
+    return { content: '{"newId":"copy-1","name":"Hero"}', display: 'Copied',
+      document: { id: 'copy-1', name: 'Hero', documentType: 'Actor', destination: args.targetLocation } };
   } }));
   const tool = new DocumentMoveTool();
   tool.setDocumentAPI({ deleteDocument: async () => { throw new Error('delete refused'); } });
@@ -61,7 +64,7 @@ test('move reports a successful copy and uncertain source after deletion fails',
   assert.equal(result.partial?.copyCompleted, true);
   assert.equal(result.partial?.sourceState, 'unknown');
   assert.deepEqual(result.partial?.destination, args.targetLocation);
-  assert.match(result.partial?.copyResult, /copy-1/);
+  assert.equal(result.partial?.document?.id, 'copy-1');
   assert.match(result.display, /check.*source.*destination/i);
 });
 

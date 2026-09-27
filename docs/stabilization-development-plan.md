@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, H2, H3, H4, M3, and M4 owner-accepted. H7 live validation is pending by owner direction. M8 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, H2, H3, H4, M3, M4, and M8 owner-accepted. H7 live validation is pending by owner direction. M9 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -366,6 +366,15 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: tests/regression/tool-result-status.test.mjs exercises returned errors, explicit failure, partial outcomes, thrown errors, success, registry metrics, executor status, history compaction, callback, and failure cards. Regression 43/43 plus compaction budget, integration 14/14, security 19/19, component 1/1, and policy passed; git whitespace check passed.
 - Limits: this aligns classification without converting every tool to a new envelope or claiming partial operations are atomic. Large partial details may remain in persisted output; M7 owns retention bounds. M9 owns copy/move actual identities and side effects; M6 owns retry/termination decisions. H7 browser validation remains pending.
 - Commit: the commit containing this entry and M8 code is titled “fix: align tool result status across boundaries (M8)”.
+- Status: **Owner accepted** on 2026-09-27: “Accepted, continue.” The permission to continue was scoped to M9. H7 remains pending.
+
+### M9 implementation — 2026-09-27
+
+- Authorization: the owner accepted M8 and directed continuation. This authorizes M9 only.
+- Disposition: **Remove unsupported paths and use actual returned identity**. Copy rejects embedded destinations before reading or writing because applyEmbeddedOperations returns no created identity. Move rejects embedded sources and destinations before side effects. Supported world/pack copies return the ID supplied by the created document and structured destination metadata; JSON.stringify builds the model-facing result. A missing ID after creation produces an uncertain-destination failure, and a create exception after the create phase begins reports unknown destination state. Move refuses source deletion unless the copy returned a matching structured document ID, type, and target location. A failed deletion reports the actual copied ID and unknown source state; a locked source pack is rejected before copying.
+- Evidence: tests/regression/copy-move-identity.test.mjs checks actual ID (including quoted names), rejection before side effects, absence of a prose-only identity, missing ID, and locked source pack. The earlier H2 tests now check structured partial identity and uncertain create-phase failures. Regression 48/48 plus compaction budget, integration 14/14, security 19/19, component 1/1, and policy passed; git whitespace check passed.
+- Limits: cross-location move is still copy then delete and cannot be atomic through this tool. A reported failure can leave a copy and an uncertain source; the response instructs the user to inspect both before retrying. No automatic retry or rollback was added. Browser/Foundry v14 real document creation and deletion remain unverified, and H7 remains pending.
+- Commit: the commit containing this entry and M9 code is titled “fix: use real copy identity and constrain moves (M9)”.
 - Status: **Awaiting owner acceptance**. No other finding was closed.
 
 ## Deterministic JavaScript opportunity register (tracking only)

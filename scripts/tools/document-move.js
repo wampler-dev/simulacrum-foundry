@@ -1,10 +1,11 @@
 import { BaseTool } from './base-tool.js';
+import { isToolResultSuccess } from '../utils/tool-result-status.js';
 
 export class DocumentMoveTool extends BaseTool {
   constructor() {
     super(
       'document_move',
-      'Move a document to a new location (world, folder, compendium, or embedded parent). This effectively creates a copy in the target location and deletes the original.',
+      'Move a document between the world and compendiums. World-to-world moves update the existing document. Cross-location moves copy, then delete; a failed deletion can leave both copies. Embedded locations are unsupported.',
       DocumentMoveTool._buildSchema(),
       true, // requires confirmation
       true  // requires response
@@ -72,6 +73,20 @@ export class DocumentMoveTool extends BaseTool {
 
     const { documentType, sourceId, sourceLocation, targetLocation, newName } = args;
 
+    if (sourceLocation?.type === 'embedded' || targetLocation?.type === 'embedded') {
+      return this.handleError('Embedded moves are unsupported: a reliable destination identity and source deletion cannot be guaranteed.', 'UNSUPPORTED_LOCATION');
+    }
+    if (!['world', 'compendium'].includes(sourceLocation?.type) ||
+        !['world', 'compendium'].includes(targetLocation?.type)) {
+      return this.handleError('Unsupported source or destination location.', 'UNSUPPORTED_LOCATION');
+    }
+    if (sourceLocation.type === 'compendium') {
+      const sourcePack = sourceLocation.pack && game.packs.get(sourceLocation.pack);
+      if (!sourcePack || sourcePack.locked) {
+        return this.handleError('Source pack is unavailable or locked; no copy was made.', 'SOURCE_UNAVAILABLE');
+      }
+    }
+
     if (sourceLocation.type === 'world' && targetLocation.type === 'world') {
       return this._handleWorldFolderMove(documentType, sourceId, targetLocation, newName);
     }
@@ -85,20 +100,31 @@ export class DocumentMoveTool extends BaseTool {
     let copyResult;
     try {
       copyResult = await copyTool.execute(args);
-      if (copyResult.error) {
-        const copyError = copyResult.error.message || copyResult.error;
-        return this.handleError(`Copy phase failed: ${copyError}`, copyResult.error.type || 'Error');
+      if (!isToolResultSuccess(copyResult)) {
+        const copyError = copyResult?.error?.message || copyResult?.error || copyResult?.content || 'Copy did not complete';
+        const failure = this.handleError(`Copy phase failed: ${copyError}`, copyResult?.error?.type || 'Error');
+        if (copyResult?.partial) failure.partial = copyResult.partial;
+        return failure;
+      }
+
+      const copied = copyResult.document;
+      if (!copied?.id || copied.documentType !== documentType ||
+          copied.destination?.type !== targetLocation.type ||
+          copied.destination?.pack !== targetLocation.pack ||
+          copied.destination?.folder !== targetLocation.folder) {
+        const failure = this.handleError('Copy returned no matching destination identity. Check the destination before retrying; source was not deleted.', 'UNKNOWN_DESTINATION');
+        failure.partial = { copyCompleted: true, destination: targetLocation, sourceState: 'unchanged' };
+        return failure;
       }
 
       await this._deleteOriginal(documentType, sourceId, sourceLocation);
 
-      const parsed = this._parseCopyResult(copyResult, documentType);
       return this.createSuccessResponse(
-        `{ "message": "Successfully moved ${documentType}", "newId": "${parsed.newId}" }`,
-        `<p>Moved <strong>${parsed.docName}</strong> successfully.</p>`
+        JSON.stringify({ message: `Successfully moved ${documentType}`, newId: copied.id, destination: targetLocation }),
+        `<p>Moved <strong>${copied.name || copied.id}</strong> successfully.</p>`
       );
     } catch (e) {
-      if (copyResult && !copyResult.error) {
+      if (isToolResultSuccess(copyResult)) {
         const failure = this.handleError(
           `Copy completed, but move failed: ${e.message}. Check source and destination before retrying.`,
           e.constructor.name
@@ -106,8 +132,8 @@ export class DocumentMoveTool extends BaseTool {
         failure.partial = {
           copyCompleted: true,
           destination: targetLocation,
+          document: copyResult.document,
           sourceState: 'unknown',
-          copyResult: copyResult.content,
         };
         return failure;
       }
@@ -146,10 +172,11 @@ export class DocumentMoveTool extends BaseTool {
       await this.documentAPI.deleteDocument(documentType, sourceId);
     } else if (location.type === 'compendium') {
       const packCollection = game.packs.get(location.pack);
-      if (!packCollection) throw new Error(`Target pack not found: ${location.pack}`);
-      if (packCollection.locked) throw new Error(`Target pack is locked: ${location.pack}`);
+      if (!packCollection) throw new Error(`Source pack not found: ${location.pack}`);
+      if (packCollection.locked) throw new Error(`Source pack is locked: ${location.pack}`);
       const doc = await packCollection.getDocument(sourceId);
-      if (doc) await doc.delete();
+      if (!doc) throw new Error(`Source document not found in pack: ${sourceId}`);
+      await doc.delete();
     } else if (location.type === 'embedded') {
       await this.documentAPI.applyEmbeddedOperations(location.parentType, location.parentId, [{
          embeddedName: documentType,
@@ -159,16 +186,4 @@ export class DocumentMoveTool extends BaseTool {
     }
   }
 
-  _parseCopyResult(copyResult, documentType) {
-    let newId = "unknown";
-    let docName = documentType;
-    try {
-       const parsedCopy = JSON.parse(copyResult.content);
-       if (parsedCopy.newId) newId = parsedCopy.newId;
-       if (parsedCopy.name) docName = parsedCopy.name;
-    } catch (e) {
-       // Ignore parsing errors
-    }
-    return { newId, docName };
-  }
 }
