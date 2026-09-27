@@ -28,7 +28,7 @@ export class DocumentReadTool extends BaseTool {
         documentId: {
           type: 'string',
           description:
-            'The ID of the document to read (e.g., "BtDHCHehjqLjmMpV"). Obtain IDs from `list_documents` or `search_documents`.',
+            'The raw document ID or full Foundry UUID to read. Full compendium UUIDs are accepted and mechanically decomposed into pack, type, and ID.',
         },
         includeEmbedded: {
           type: 'boolean',
@@ -71,10 +71,13 @@ export class DocumentReadTool extends BaseTool {
   async execute(parameters) {
     try {
       this.validateParameters(parameters, this.schema);
-      const { documentType, pack } = parameters;
+      let { documentType, pack } = parameters;
+      const resolved = this._resolveReferenceParameters(parameters.documentId, documentType, pack);
+      documentType = resolved.documentType;
+      pack = resolved.pack;
       // Extract raw ID from UUID references that models may pass
       // e.g. "@UUID[JournalEntry.BtDHCHehjqLjmMpV]{Sunken Halls}" → "BtDHCHehjqLjmMpV"
-      const documentId = BaseTool.extractRawId(parameters.documentId);
+      const documentId = resolved.documentId;
 
       if (!this.isValidDocumentType(documentType) && !pack) {
         return this._createErrorResponse(
@@ -106,6 +109,27 @@ export class DocumentReadTool extends BaseTool {
       const code = isNotFound ? 'DOCUMENT_NOT_FOUND' : 'UNKNOWN_ERROR';
       return this._createErrorResponse(parameters.documentType, code, error.message);
     }
+  }
+
+  _resolveReferenceParameters(value, documentType, pack) {
+    const raw = String(value ?? '').trim();
+    const uuidMatch = raw.match(
+      /^(?:@UUID\[)?Compendium\.([^.]+\.[^.]+)\.([^.]+)\.([^\]}]+)(?:\]\{[^}]*\})?$/
+    );
+
+    if (uuidMatch) {
+      return {
+        pack: pack || uuidMatch[1],
+        documentType: documentType || uuidMatch[2],
+        documentId: uuidMatch[3],
+      };
+    }
+
+    return {
+      pack,
+      documentType,
+      documentId: BaseTool.extractRawId(value),
+    };
   }
 
   async _fetchDocument(type, id, options = {}) {
