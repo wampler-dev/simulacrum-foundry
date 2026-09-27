@@ -12,7 +12,7 @@ class DocumentSearchTool extends BaseTool {
   constructor() {
     super(
       'search_documents',
-      'Search document names by default. For a requested book/module, first discover its installed pack ID with list_documents(documentType="Compendium") unless already known from tool results. Do not guess pack IDs or substitute a different named document. For an exact named reference, set exact=true and optionally source to "world", a pack ID, or an exact pack title; one match supplies identity only, so read_document is still required for facts. Supply indexed field paths for broad searches where available; compendium search uses the pack index, not full contents. Use list_documents to browse without a query.',
+      'Search document names by default. For a requested book/module, first use list_documents(documentType="Compendium") to select its source package, then list that packageId to obtain its pack IDs, unless already known from tool results. Do not guess pack IDs or substitute a different named document. For an exact named reference, set exact=true and optionally source to "world", a pack ID, or an exact pack title; one match supplies identity only, so read_document is still required for facts. Supply indexed field paths for broad searches where available; compendium search uses the pack index, not full contents. Use list_documents to browse without a query.',
       {
         type: 'object',
         properties: {

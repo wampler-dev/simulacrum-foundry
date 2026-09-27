@@ -43,8 +43,10 @@ test('discover same-title installed packs, select exact source, and read without
   const { schemas } = getTurnToolSchemas([{ role: 'user', content: 'Find the Goblin Warrior from the D&D Monster Manual. Do not modify anything.' }], registry);
   assert.deepEqual(schemas.map(s => s.function.name), ['list_documents', 'search_documents', 'read_document']);
   const catalog = await list.execute({ documentType: 'Compendium' });
-  assert.match(catalog.content, /dnd-monster-manual\.actors.*Dungeons & Dragons Monster Manual/);
-  assert.match(catalog.content, /dnd5e\.monsters.*D&D Fifth Edition/);
+  assert.match(catalog.content, /dnd-monster-manual.*Dungeons & Dragons Monster Manual/);
+  assert.match(catalog.content, /dnd5e.*D&D Fifth Edition/);
+  const scoped = await list.execute({ documentType: 'Compendium', packageId: 'dnd-monster-manual' });
+  assert.deepEqual(JSON.parse(scoped.content).entries, [{ pack: 'dnd-monster-manual.actors', title: 'Actors', documentType: 'Actor' }]);
   assert.doesNotMatch(catalog.content, /hidden\.actors/);
   assert.deepEqual(seen, [], 'discovery reads metadata only');
   const wrong = await search.execute({ query: 'Goblin Warrior', exact: true, pack: 'dnd5e.monsters' });

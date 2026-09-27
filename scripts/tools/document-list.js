@@ -12,14 +12,22 @@ class DocumentListTool extends BaseTool {
   constructor() {
     super(
       'list_documents',
-      'List documents by type, returning names, IDs, and UUID references. Use this to browse or inventory documents when you do not have a specific search term — for targeted text searches, use `search_documents` instead. Omit `documentType` to list all available document types with counts. Pass `documentType` as "Compendium" to discover installed pack IDs and their owning modules/systems before choosing a source.',
+      'List documents by type, returning names, IDs, and UUID references. Use this to browse or inventory documents when you do not have a specific search term — for targeted text searches, use `search_documents` instead. Omit `documentType` to list all available document types with counts. Pass documentType="Compendium" to list source packages, then pass the selected packageId to list its exact pack IDs. Follow nextPage when present.',
       {
         type: 'object',
         properties: {
           documentType: {
             type: 'string',
             description:
-              'The document class to list (e.g., Actor, Item, JournalEntry, RollTable, Folder). Omit to list all available document types with counts. Pass "Compendium" to list compendium packs.',
+              'The document class to list (e.g., Actor, Item, JournalEntry, RollTable, Folder). Omit to list all available document types with counts. Pass "Compendium" to discover source packages and their packs.',
+          },
+          packageId: {
+            type: 'string',
+            description: 'Only with documentType="Compendium": an exact packageId returned by source discovery. Lists packs owned by that source; package IDs are not pack IDs.',
+          },
+          pageOffset: {
+            type: 'integer', minimum: 0,
+            description: 'Only for Compendium discovery: use the nextPage arguments from a prior result; defaults to zero.',
           },
           filters: {
             type: 'object',
@@ -48,6 +56,10 @@ class DocumentListTool extends BaseTool {
    * @returns {Object} Tool result
    */
   async execute(params) {
+    if ((params.packageId !== undefined || params.pageOffset !== undefined) && params.documentType !== 'Compendium') {
+      const message = 'packageId and pageOffset apply only to Compendium discovery';
+      return { content: message, error: { type: 'DISCOVERY_FAILED', message } };
+    }
     // If no documentType specified, list all available document types
     if (!params.documentType) {
       return this.listAllDocumentTypes();
@@ -55,11 +67,7 @@ class DocumentListTool extends BaseTool {
 
     // If documentType is "Compendium", list available packs
     if (params.documentType === 'Compendium') {
-      const packs = DocumentAPI.listPacks();
-      return {
-        content: this.formatPackList(packs),
-        display: `Found **${packs.length}** Compendium Packs`,
-      };
+      return this.listCompendiumSources(params);
     }
 
     // Validate document type exists in current system (unless reading from a pack, which might have its own types)
@@ -204,20 +212,53 @@ class DocumentListTool extends BaseTool {
     return grouped;
   }
 
-  /**
-   * Format pack list for display
-   * @param {Array} packs - Packs to format
-   * @returns {string} Formatted pack list
-   */
-  formatPackList(packs) {
-    if (packs.length === 0) return 'No Compendium Packs found.';
-
-    const lines = packs.map(p => {
-      return `- **${p.title}** (${p.id}) — ${p.packageTitle} (${p.packageId}) [${p.documentName}, ${p.count} docs]`;
-    });
-
-    return '**Available Compendium Packs**:\n' + lines.join('\n');
+  /** Small source/pack pages stay below the dispatcher's generic compaction threshold. */
+  listCompendiumSources({ packageId, pageOffset = 0 }) {
+    const fail = message => ({ content: message, error: { type: 'DISCOVERY_FAILED', message } });
+    if (!Number.isInteger(pageOffset) || pageOffset < 0) return fail('pageOffset must be a non-negative integer');
+    if (packageId !== undefined && (typeof packageId !== 'string' || !packageId)) {
+      return fail('packageId must be an exact source ID returned by discovery');
+    }
+    const packs = DocumentAPI.listPacks();
+    let entries;
+    if (packageId !== undefined) {
+      entries = packs.filter(p => p.packageId === packageId).map(p => ({
+        pack: p.id, title: p.title, documentType: p.documentName,
+      }));
+      if (!entries.length) return fail('No readable packs belong to that packageId; list source packages first');
+    } else {
+      const sources = new Map();
+      for (const p of packs) {
+        const source = sources.get(p.packageId) || { packageId: p.packageId, title: p.packageTitle, packCount: 0 };
+        source.packCount++;
+        sources.set(p.packageId, source);
+      }
+      entries = [...sources.values()];
+    }
+    entries.sort((a, b) => (a.pack || a.packageId).localeCompare(b.pack || b.packageId));
+    if (pageOffset > 0 && pageOffset >= entries.length) return fail('pageOffset is outside the current catalog; restart at zero');
+    const rows = [];
+    const makeResult = () => {
+      const nextOffset = pageOffset + rows.length;
+      const nextPage = nextOffset < entries.length
+        ? { documentType: 'Compendium', ...(packageId !== undefined ? { packageId } : {}), pageOffset: nextOffset } : null;
+      return {
+        content: JSON.stringify({ kind: packageId === undefined ? 'sources' : 'packs',
+          ...(packageId !== undefined ? { packageId } : {}), total: entries.length, entries: rows, nextPage,
+          guidance: packageId === undefined
+            ? 'Select the requested source by title, then call list_documents with documentType="Compendium" and its packageId. A packageId is not a pack ID.'
+            : 'Use the exact pack ID with the required documentType in search_documents. Do not substitute another source.' }),
+        display: `Showing ${rows.length} of ${entries.length} ${packageId === undefined ? 'source packages' : 'packs'}${nextPage ? '; more pages available' : ''}`,
+      };
+    };
+    for (const entry of entries.slice(pageOffset, pageOffset + 20)) {
+      rows.push(entry);
+      if (JSON.stringify(makeResult()).length > 3500) { rows.pop(); break; }
+    }
+    if (entries.length && !rows.length) return fail('A catalog entry exceeds the discovery output budget; source identity was not truncated');
+    return makeResult();
   }
+
 }
 
 // Export the DocumentListTool class
