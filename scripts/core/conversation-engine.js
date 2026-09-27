@@ -8,6 +8,7 @@
 import { SimulacrumCore } from './simulacrum-core.js';
 import { processToolCallLoop } from './tool-loop-handler.js';
 import { toolRegistry } from './tool-registry.js';
+import { toolPermissionManager } from './tool-permission-manager.js';
 import { ACTION_TOOL_NAMES, getTurnToolSchemas } from './turn-capabilities.js';
 import { toolFailureMessage } from './turn-failure.js';
 import { appendEmptyContentCorrection, appendToolFailureCorrection } from './correction.js';
@@ -39,8 +40,10 @@ class ConversationEngine {
    */
   async processTurn(options = {}) {
     const { signal, onAssistantMessage, onToolResult } = options;
-    const { allowed, schemas: tools } = getTurnToolSchemas(this.conversationManager.getMessages(), toolRegistry);
-    const requestedActions = new Set([...allowed].filter(name => ACTION_TOOL_NAMES.has(name)));
+    const scoped = getTurnToolSchemas(this.conversationManager.getMessages(), toolRegistry);
+    const tools = scoped.schemas.filter(schema => !toolPermissionManager.isBlacklisted(schema.function?.name || schema.name));
+    const allowed = new Set(tools.map(schema => schema.function?.name || schema.name));
+    const requestedActions = new Set([...scoped.allowed].filter(name => ACTION_TOOL_NAMES.has(name)));
 
     // Get initial assistant response
     let aiResponse = await SimulacrumCore.generateResponse(this.conversationManager.getMessages(), {
@@ -128,7 +131,7 @@ class ConversationEngine {
       requestedActions,
       conversationManager: this.conversationManager,
       aiClient: SimulacrumCore.aiClient,
-      getSystemPrompt: SimulacrumCore.getSystemPrompt.bind(SimulacrumCore),
+      getSystemPrompt: () => SimulacrumCore.getSystemPrompt({ tools }),
       currentToolSupport,
       signal,
       onToolResult: onToolResult || null,

@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M7, M8, and M9 owner-accepted for implemented code. H7 live validation is pending by owner direction. M6 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, H1, H2, H3, H4, H5, H6, M1, M2, M3, M4, M5, M6, M7, M8, and M9 owner-accepted for implemented code. H7 live validation is pending by owner direction. M11 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -438,6 +438,15 @@ No scope expansion and no new task without the owner's explicit permission.
 - Evidence: tests/integration/local/tool-loop-continuation.test.mjs covers provider exhaustion, cancellation, denied tool followed by claimed success, read-only tool followed by claimed mutation, recovery through successful retry, and bounded iteration. tests/security/turn-capabilities.test.mjs covers action without a tool call and initial tool-call failure exhaustion without fallback. Regression 59/59, integration 19/19, security 26/26, component 1/1, and policy passed; git whitespace check passed.
 - Limits: the turn capability classifier from H6 defines which requests count as explicit actions; uncommon wording can be under- or overselected. Successful tool result does not prove that all requested multi-step work was completed, and partial side effects still require inspecting tool results. Provider retry policy inside AIClient still allows up to six transport attempts; operational loop limits are L4. No live Foundry/Ollama execution or browser UI/reload check occurred. H7 remains pending.
 - Commit: the commit containing this entry and M6 code is titled “fix: make tool failure and completion truthful (M6)”.
+- Status: **Owner accepted** on 2026-09-27: “Accepted, please continue.” Continuation was scoped to M11.
+
+### M11 implementation — 2026-09-27
+
+- Authorization: the owner accepted M6 and directed continuation. This authorizes M11 only.
+- Disposition: **Remove obsolete prompt sections and scope legacy schemas**. The active prompt now contains a short stable identity/work rule and the user's optional custom instructions. Native mode uses provider-supplied selected schemas without duplicating them in the prompt. Legacy mode embeds only the selected, nonblacklisted schemas with the inline JSON call format. The prompt no longer enumerates macros, every document subtype, `manage_task`, nonexistent `document_*` names, or the superseded rule requiring `end_loop` after every answer. The effective schema set is kept through compaction and loop continuations; the executor remains authoritative.
+- Evidence: tests/regression/scoped-system-prompt.test.mjs inspects actual native and legacy outbound requests, including forced compaction, and verifies the legacy prompt has only the selected schema while native prompt has no schema dump. The native builder test would fail if it enumerated macros. Regression 62/62, integration 19/19, security 26/26, component 1/1, and policy passed; git whitespace check passed.
+- Limits: the user-defined custom prompt can still mention unavailable tools, and legacy inline parsing remains dependent on model compliance; the dispatcher enforces the turn scope. Old localization strings remain in en.json but are no longer referenced by the active builder; removing those unused keys would offer little runtime benefit. No live Ollama/Foundry prompt or context measurement occurred. H7 remains pending.
+- Commit: the commit containing this entry and M11 code is titled “fix: scope system prompt to active capabilities (M11)”.
 - Status: **Awaiting owner acceptance**. No other finding was closed.
 
 ### Newly observed candidate — pack read permissions (investigate with separate authorization)

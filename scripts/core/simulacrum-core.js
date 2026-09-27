@@ -227,7 +227,7 @@ class SimulacrumCore {
 
       // Get system prompt early so compaction can account for its token overhead
       const useCustomPrompt = !!options.systemPrompt;
-      let systemPrompt = options.systemPrompt || (await this.getSystemPrompt());
+      let systemPrompt = options.systemPrompt || (await this.getSystemPrompt({ tools }));
       const getSystemPromptFn = () => systemPrompt;
 
       // Only replace the outbound array when it came from the managed conversation.
@@ -235,7 +235,7 @@ class SimulacrumCore {
 
       // Trigger compaction if approaching token limit, looping until within budget
       if (this.conversationManager && this.aiClient) {
-        systemPrompt = await this._compactHistoryIfNeeded(systemPrompt, useCustomPrompt, options);
+        systemPrompt = await this._compactHistoryIfNeeded(systemPrompt, useCustomPrompt, { ...options, tools });
       }
 
       // Legacy capping removed in favor of Tiered Context Compaction
@@ -438,8 +438,8 @@ class SimulacrumCore {
     return getMacros();
   }
 
-  static async getSystemPrompt() {
-    let prompt = await buildSystemPrompt();
+  static async getSystemPrompt({ tools = [] } = {}) {
+    let prompt = await buildSystemPrompt({ tools });
     if (this.conversationManager?.rollingSummary) {
       prompt = `### PREVIOUS CONVERSATION SUMMARY\n${this.conversationManager.rollingSummary}\n### END OF SUMMARY\n\n${prompt}`;
     }
@@ -468,7 +468,7 @@ class SimulacrumCore {
         if (compactionStatus === COMPACTION_STATUS.FAILED) break;
 
         anyCompacted = true;
-        systemPrompt = useCustomPrompt ? systemPrompt : await this.getSystemPrompt();
+        systemPrompt = useCustomPrompt ? systemPrompt : await this.getSystemPrompt({ tools: options.tools });
         promptOverhead = this._estimatePromptOverhead(systemPrompt, includeRollingSummary);
       }
 

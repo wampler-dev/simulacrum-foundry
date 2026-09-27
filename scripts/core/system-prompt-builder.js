@@ -5,7 +5,6 @@
  */
 
 import { createLogger } from '../utils/logger.js';
-import { toolRegistry } from './tool-registry.js';
 
 const logger = createLogger('SystemPrompt');
 
@@ -67,72 +66,20 @@ export async function getAvailableMacrosList() {
  * Build the complete system prompt
  * @returns {Promise<string>} The system prompt
  */
-export async function buildSystemPrompt() {
-  const documentTypesInfo = getDocumentTypesInfo();
+export async function buildSystemPrompt({ tools = [] } = {}) {
   const legacyMode = game?.settings?.get('simulacrum', 'legacyMode') || false;
   const customSystemPrompt = game?.settings?.get('simulacrum', 'customSystemPrompt') || '';
-
-  // Fetch available macros (World + Module) for execution context
-  const macrosList = await getAvailableMacrosList();
-
-  let basePrompt;
-
+  const scopedTools = Array.isArray(tools) ? tools : [];
+  const instructions = [
+    game.i18n.localize('SIMULACRUM.SystemPrompt.Standard.Identity'),
+    'Use only tools offered for this request. Answer directly when no tool is needed. Read existing documents before updating or deleting them. Report only actions and results actually observed; say when work failed or needs clarification. A plain-language final answer ends the turn.',
+  ];
   if (legacyMode) {
-    let toolSchemas = '';
-    try {
-      const schemas = toolRegistry.getToolSchemas();
-      // Assertion: schemas must be present and well-formed in legacy mode
-      const hasSchemas = Array.isArray(schemas) && schemas.length > 0;
-      const allWellFormed =
-        hasSchemas &&
-        schemas.every(
-          s =>
-            s &&
-            s.type === 'function' &&
-            s.function &&
-            s.function.name &&
-            s.function.parameters &&
-            s.function.parameters.type === 'object'
-        );
-      if (!hasSchemas || !allWellFormed) {
-        // Log a clear warning for maintainers and guide the model conservatively
-        logger.warn(
-          'Legacy mode active but tool schemas are missing or malformed; tool calls may fail.'
-        );
-        toolSchemas = '\n\nWARNING: Tool schemas are unavailable. Do NOT attempt tool calls.';
-      } else {
-        toolSchemas = `\n\nAvailable tool schemas:\n${JSON.stringify(schemas, null, 2)}`;
-      }
-    } catch (e) {
-      logger.error('Failed to retrieve tool schemas for legacy mode', e);
-    }
-
-    basePrompt = [
-      game.i18n.localize('SIMULACRUM.SystemPrompt.Legacy.Intro_v2'),
-      game.i18n.localize('SIMULACRUM.SystemPrompt.Legacy.CriticalRules'),
-      game.i18n.localize('SIMULACRUM.SystemPrompt.Legacy.ResearchFirst'),
-      documentTypesInfo,
-      game.i18n.localize('SIMULACRUM.SystemPrompt.Legacy.Instructions'),
-      game.i18n.localize('SIMULACRUM.SystemPrompt.Legacy.Format'),
-      game.i18n.localize('SIMULACRUM.SystemPrompt.Legacy.Warning'),
-      game.i18n.localize('SIMULACRUM.SystemPrompt.Legacy.Action'),
-      game.i18n.localize('SIMULACRUM.SystemPrompt.Legacy.DocumentSchema'),
-      game.i18n.localize('SIMULACRUM.SystemPrompt.Legacy.TaskTracking'),
-      game.i18n.localize('SIMULACRUM.SystemPrompt.Legacy.EndTask'),
-      toolSchemas,
-    ].join('\n\n');
-  } else {
-    basePrompt = [
-      game.i18n.localize('SIMULACRUM.SystemPrompt.Standard.Identity'),
-      game.i18n.localize('SIMULACRUM.SystemPrompt.Standard.CriticalRules'),
-      documentTypesInfo,
-      game.i18n.localize('SIMULACRUM.SystemPrompt.Standard.StrategicProtocol'),
-      game.i18n.localize('SIMULACRUM.SystemPrompt.Standard.ToolOperatives'),
-      `## Available Macros\nThe following macros are available for execution via the execute_macro tool:\n${macrosList}`,
-      game.i18n.localize('SIMULACRUM.SystemPrompt.Standard.CommunicationStyle_v2'),
-      game.i18n.localize('SIMULACRUM.SystemPrompt.Standard.LoopTermination'),
-    ].join('\n\n');
+    instructions.push(scopedTools.length
+      ? `To call an offered tool, use a JSON block: {"tool_call":{"name":"tool_name","arguments":{}}}. Available tool schemas: ${JSON.stringify(scopedTools)}`
+      : 'No tools are available for this request. Respond in plain language.');
   }
+  let basePrompt = instructions.join('\n\n');
 
   // Append custom system prompt if provided
   if (customSystemPrompt && customSystemPrompt.trim().length > 0) {
