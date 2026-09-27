@@ -36,6 +36,16 @@ const DESTRUCTIVE_TOOL_META = {
     explainer: 'SIMULACRUM.ToolExplainer.DeleteDocument',
     defaultState: PermissionState.ASK,
   },
+  document_copy: {
+    displayName: 'SIMULACRUM.Tools.document_copy',
+    explainer: 'SIMULACRUM.ToolExplainer.CopyDocument',
+    defaultState: PermissionState.ASK,
+  },
+  document_move: {
+    displayName: 'SIMULACRUM.Tools.document_move',
+    explainer: 'SIMULACRUM.ToolExplainer.MoveDocument',
+    defaultState: PermissionState.ASK,
+  },
   execute_macro: {
     displayName: 'SIMULACRUM.Tools.execute_macro',
     explainer: 'SIMULACRUM.ToolExplainer.ExecuteMacro',
