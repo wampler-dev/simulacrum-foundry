@@ -1,6 +1,6 @@
 # Stabilization development plan
 
-Status: **Required scope; C1, C2, and H1 owner-accepted. H7 live validation is pending by owner direction. Work dependent on H7 waits; other tasks still require explicit owner permission.**
+Status: **Required scope; C1, C2, and H1 owner-accepted. H7 live validation is pending by owner direction. H2 implementation awaits owner acceptance. Work dependent on H7 waits; other tasks still require explicit owner permission.**
 Owner: wampler-dev
 Adopted: 2026-09-27
 Branch: `restart/from-upstream-main`
@@ -311,3 +311,14 @@ No scope expansion and no new task without the owner's explicit permission.
 - H7 is **pending**, open, and unaccepted. Do not repeat live access attempts, install the branch, or claim the mitigation is validated until the owner reopens that task and an authorized environment is available.
 - Any work whose correctness requires H7 browser or UI evidence, including final UI presentation acceptance and release readiness, remains pending with it. Independent plan findings are not blocked merely by H7's pending status; each new task still requires the owner's explicit permission under AGENTS.md.
 - This decision changes scheduling only. The H7 code and test evidence are unchanged.
+
+### H2 implementation — 2026-09-27
+
+- Authorization: after the H7 deferral, the owner stated “Excellent. I accept this current state and am willing to continue.” The next independent task was identified as H2 and explicitly scoped in the progress update. The authorization was applied to H2 only.
+- Disposition: **Small fix, reuse existing code**. Replaced nonexistent createErrorResponse calls in document-copy.js and document-move.js with BaseTool.handleError. A missing source returns NotFoundError. Copy-phase failures preserve the original error message and type. World-folder update errors and a missing copy tool return normal error envelopes.
+- Partial move: when the copy tool reports success and a later move phase throws, the response states that the move failed, instructs checking source and destination before retrying, and includes structured partial data: copyCompleted, destination, sourceState: unknown, and the returned copy content. It deliberately does not claim the source remains or assign a fabricated destination identity. M9 still owns non-atomic move semantics and actual returned IDs.
+- Evidence: five behavioral tests in tests/regression/copy-move-errors.test.mjs exercised missing source, failed creation, copy-phase error, deletion failure after copy, missing copy tool, and world-folder update failure. The original code failed all five scenarios, typically with a secondary TypeError. All five pass after the change.
+- Verification: regression tier **33/33 passed** plus the standalone compaction budget script; integration **14/14**, security **19/19**, policy passed; git whitespace check passed. Static tier still requires uninstalled ESLint dependencies in this checkout. No live Foundry v14/D&D5e document mutation was performed.
+- Limits: a tool can report a failure after an uncertain side effect; this response reports the known phase and unknown source state. H1 approval remains in the dispatcher. M9 copy/move target identity and transaction behavior remain open. H7 remains pending independently.
+- Commit: the commit containing this entry and H2 code is titled “fix: preserve copy and move failure details (H2)”.
+- Status: **Awaiting owner acceptance**. No other finding was closed.

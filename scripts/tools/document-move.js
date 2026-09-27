@@ -79,13 +79,15 @@ export class DocumentMoveTool extends BaseTool {
     const { toolRegistry } = await import('../core/tool-registry.js');
     const copyTool = toolRegistry.getTool('document_copy');
     if (!copyTool) {
-       return this.createErrorResponse('Internal Error: document_copy tool not found.');
+       return this.handleError('Internal Error: document_copy tool not found.');
     }
 
+    let copyResult;
     try {
-      const copyResult = await copyTool.execute(args);
+      copyResult = await copyTool.execute(args);
       if (copyResult.error) {
-        return this.createErrorResponse(`Copy phase failed: ${copyResult.error}`);
+        const copyError = copyResult.error.message || copyResult.error;
+        return this.handleError(`Copy phase failed: ${copyError}`, copyResult.error.type || 'Error');
       }
 
       await this._deleteOriginal(documentType, sourceId, sourceLocation);
@@ -96,7 +98,20 @@ export class DocumentMoveTool extends BaseTool {
         `<p>Moved <strong>${parsed.docName}</strong> successfully.</p>`
       );
     } catch (e) {
-      return this.createErrorResponse(`Move failed: ${e.message}`);
+      if (copyResult && !copyResult.error) {
+        const failure = this.handleError(
+          `Copy completed, but move failed: ${e.message}. Check source and destination before retrying.`,
+          e.constructor.name
+        );
+        failure.partial = {
+          copyCompleted: true,
+          destination: targetLocation,
+          sourceState: 'unknown',
+          copyResult: copyResult.content,
+        };
+        return failure;
+      }
+      return this.handleError(`Move failed: ${e.message}`, e.constructor.name);
     }
   }
 
@@ -122,7 +137,7 @@ export class DocumentMoveTool extends BaseTool {
         `<p>No changes needed.</p>`
       );
     } catch(e) {
-      return this.createErrorResponse(`Failed to move world document: ${e.message}`);
+      return this.handleError(`Failed to move world document: ${e.message}`, e.constructor.name);
     }
   }
 

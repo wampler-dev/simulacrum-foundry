@@ -75,7 +75,7 @@ export class DocumentCopyTool extends BaseTool {
     try {
       const sourceData = await this._resolveSource(documentType, sourceId, sourceLocation);
       if (!sourceData) {
-        return this.createErrorResponse(`Source document not found: ${sourceId}`);
+        return this.handleError(`Source document not found: ${sourceId}`, 'NotFoundError');
       }
 
       const cloneData = this._prepareClone(sourceData, newName, targetLocation);
@@ -92,7 +92,7 @@ export class DocumentCopyTool extends BaseTool {
         `<p>Copied <strong>${createdDoc.name}</strong> to <em>${targetDesc}</em></p>`
       );
     } catch (e) {
-      return this.createErrorResponse(`Copy failed: ${e.message}`);
+      return this.handleError(`Copy failed: ${e.message}`, e.constructor.name);
     }
   }
 
