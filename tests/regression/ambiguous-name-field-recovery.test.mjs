@@ -39,6 +39,22 @@ test('one exact candidate among substring matches stays a broad result, not a cl
   assert.equal(result.candidates.length, 2);
 });
 
+test('capped exact search discloses incomplete source choices', async t => {
+  const previous = globalThis.game;
+  globalThis.game = { packs: new Map() };
+  t.after(() => { globalThis.game = previous; });
+  t.mock.method(DocumentAPI, 'searchDocuments', async options => {
+    assert.equal(options.maxResults, 10);
+    return Array.from({ length: 10 }, (_, i) => ({ type: 'Actor', _id: `actor${i}`, name: 'Goblin Warrior', pack: `source${i}.actors` }));
+  });
+  const result = await new DocumentSearchTool().execute({ query: 'Goblin Warrior', exact: true });
+  const body = JSON.parse(result.content);
+  assert.equal(body.status, 'ambiguous');
+  assert.equal(body.limitReached, true);
+  assert.match(result.display, /at least 10/);
+  assert.match(body.guidance, /Additional matches may exist/);
+});
+
 test('missing HP suffix yields actual prepared path for explicit retry without reading unrelated getters', async t => {
   const previous = globalThis.game;
   globalThis.game = { documentTypes: { Actor: ['npc'] }, collections: new Map([['Actor', {}]]) };

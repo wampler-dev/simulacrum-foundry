@@ -92,9 +92,11 @@ test('exact names resolve a readable source without treating the index as docume
   const tool = new DocumentSearchTool();
   const ambiguous = await tool.execute({ query: 'Goblin', exact: true });
   assert.equal(JSON.parse(ambiguous.content).status, 'ambiguous');
-  assert.equal(JSON.parse(ambiguous.content).candidates.length, 2);
+  assert.equal(JSON.parse(ambiguous.content).candidates.length, 3);
+  assert.deepEqual(JSON.parse(ambiguous.content).candidates.map(candidate => candidate.source), ['world', 'world.one', 'world.two']);
+  assert.equal(JSON.parse(ambiguous.content).limitReached, false);
   assert.doesNotMatch(ambiguous.content, /Goblin Veteran|Goblin Shaman/);
-  assert.equal(requests.length, 1, 'stop as soon as a second exact candidate proves ambiguity');
+  assert.equal(requests.length, 2, 'include later packs so source choices are complete below the cap');
 
   const selected = await tool.execute({ query: 'gObLiN', exact: true, source: 'monster manual' });
   assert.equal(JSON.parse(selected.content).status, 'unique');

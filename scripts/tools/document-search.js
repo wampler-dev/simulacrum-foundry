@@ -40,7 +40,7 @@ class DocumentSearchTool extends BaseTool {
           },
           exact: {
             type: 'boolean', default: false,
-            description: 'Match the complete document name (case insensitive). Returns up to two candidates to distinguish a unique match from ambiguity; use only with the default name field.',
+            description: 'Match the complete document name (case insensitive). Returns up to ten source-qualified candidates; use only with the default name field.',
           },
           source: {
             type: 'string',
@@ -48,7 +48,7 @@ class DocumentSearchTool extends BaseTool {
           },
           maxResults: {
             type: 'integer', minimum: 1, maximum: 100,
-            description: 'Broad search limit across all sources: default 50, maximum 100. Exact mode checks up to two matches regardless of this value.',
+            description: 'Broad search limit across all sources: default 50, maximum 100. Exact mode checks up to ten matches regardless of this value.',
           },
         },
         required: ['query'],
@@ -70,7 +70,7 @@ class DocumentSearchTool extends BaseTool {
         query: params.query,
         types: params.documentTypes,
         fields: params.fields,
-        maxResults: params.exact === true ? 2 : params.maxResults,
+        maxResults: params.exact === true ? 10 : params.maxResults,
         pack: params.pack,
         source: params.source,
         exact: params.exact === true,
@@ -79,16 +79,17 @@ class DocumentSearchTool extends BaseTool {
       const resultCount = results.length;
       const requestedSource = params.pack || params.source || 'all accessible sources';
       if (params.exact === true) {
-        const status = resultCount === 0 ? 'No exact match' : resultCount === 1 ? 'One exact match' : 'Ambiguous exact name (at least two matches)';
+        const limitReached = resultCount >= 10;
+        const status = resultCount === 0 ? 'No exact match' : resultCount === 1 && !limitReached ? 'One exact match' : `Ambiguous exact name (${limitReached ? 'at least ' : ''}${resultCount} matches)`;
         const guidance = resultCount === 1
           ? 'This match supplies identity only. Call read_document with its arguments for document facts.'
-          : resultCount > 1 ? 'Specify a source or ask the user to choose; do not select a candidate arbitrarily.'
+          : resultCount > 1 ? `Ask the user to choose a source/document; do not select a candidate arbitrarily.${limitReached ? ' Additional matches may exist; use source discovery if the requested source is not shown.' : ''}`
             : 'Check the name or source; do not treat a partial name as an exact match.';
         return {
           content: this.formatSearchResults(results, params.query, {
             requestedSource,
             status: resultCount === 0 ? 'no_match' : resultCount === 1 ? 'unique' : 'ambiguous',
-            guidance,
+            guidance, limitReached,
           }),
           display: `${status}. Searched source: ${requestedSource}. ${guidance}`,
         };
