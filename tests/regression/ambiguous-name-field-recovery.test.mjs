@@ -57,7 +57,7 @@ test('capped exact search discloses incomplete source choices', async t => {
 
 test('missing HP suffix yields actual prepared path for explicit retry without reading unrelated getters', async t => {
   const previous = globalThis.game;
-  globalThis.game = { documentTypes: { Actor: ['npc'] }, collections: new Map([['Actor', {}]]) };
+  globalThis.game = { system: { id: 'dnd5e' }, documentTypes: { Actor: ['npc'] }, collections: new Map([['Actor', {}]]) };
   t.after(() => { globalThis.game = previous; documentReadRegistry.clear(); });
   const system = { currency: {}, attributes: { hp: { value: 10 }, ac: { value: 15 } } };
   Object.defineProperty(system, 'unrelated', { enumerable: true, get() { throw new Error('Must not invoke getters while suggesting paths'); } });
@@ -75,6 +75,19 @@ test('missing HP suffix yields actual prepared path for explicit retry without r
   const retry = parse(await read.execute({ documentType: 'Actor', documentId: 'actor', fields: first.fieldHints[0].suggestedFields }));
   assert.equal(retry.fields['system.attributes.hp.value'], 10);
   assert.equal(retry.fieldSources['system.attributes.hp.value'], 'prepared');
+  const wrongShape = parse(await read.execute({ documentType: 'Actor', documentId: 'actor', fields: ['system.health.hitPoints.value'] }));
+  assert.deepEqual(wrongShape.missingFields, ['system.health.hitPoints.value']);
+  assert.deepEqual(wrongShape.fieldHints[0].suggestedFields, ['system.attributes.hp.value']);
+  assert.deepEqual(wrongShape.fields, {}, 'the hint cannot return HP without another explicit read');
+  const corrected = parse(await read.execute({ documentType: 'Actor', documentId: 'actor', fields: wrongShape.fieldHints[0].suggestedFields }));
+  assert.equal(corrected.fields['system.attributes.hp.value'], 10);
+  game.system.id = 'other-system';
+  const other = parse(await read.execute({ documentType: 'Actor', documentId: 'actor', fields: ['system.health.hitPoints.value'] }));
+  assert.deepEqual(other.fieldHints[0].suggestedFields, [], 'do not assume D&D5e paths for other systems');
+  game.system.id = 'dnd5e';
+  delete system.attributes.hp;
+  const absent = parse(await read.execute({ documentType: 'Actor', documentId: 'actor', fields: ['system.health.hitPoints.value'] }));
+  assert.deepEqual(absent.fieldHints[0].suggestedFields, [], 'do not suggest an HP path absent from the document');
 });
 
 test('path suggestions keep multiple alternatives and enforce depth, breadth, and result caps', () => {

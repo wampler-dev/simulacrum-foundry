@@ -184,7 +184,7 @@ export class DocumentReadTool extends BaseTool {
         if (value === undefined) {
           missingFields.push(path);
           const hintData = path.startsWith('system.') && preparedSystem != null ? { system: preparedSystem } : data;
-          if (fieldHints.length < 5) fieldHints.push(this._missingFieldHint(hintData, path));
+          if (fieldHints.length < 5) fieldHints.push(this._missingFieldHint(hintData, path, params.documentType));
         } else {
           fields[path] = value;
           fieldSources[path] = prepared !== undefined ? 'prepared' : 'stored';
@@ -205,7 +205,7 @@ export class DocumentReadTool extends BaseTool {
       part != null && Object.hasOwn(Object(part), key) ? part[key] : undefined, data);
   }
 
-  _missingFieldHint(data, requestedPath) {
+  _missingFieldHint(data, requestedPath, documentType) {
     let parent = data;
     const parts = [];
     for (const key of requestedPath.split('.')) {
@@ -215,10 +215,30 @@ export class DocumentReadTool extends BaseTool {
     }
     const parentPath = parts.join('.');
     const keys = parent && typeof parent === 'object' && !Array.isArray(parent) ? Object.keys(parent) : [];
+    const nearby = this._findFieldPaths(parent, parts, requestedPath.split('.').slice(parts.length));
+    // D&D5e Actors expose HP at this prepared path. Suggest it only when the
+    // user's requested path names HP and the actual document contains it.
+    if (documentType === 'Actor' && game?.system?.id === 'dnd5e' &&
+        /^system\.(?:.*\.)?(?:hp|hitpoints)(?:\.|$)/i.test(requestedPath) &&
+        this._hasOwnDataPath(data, ['system', 'attributes', 'hp', 'value']) &&
+        !nearby.suggestedFields.includes('system.attributes.hp.value')) {
+      nearby.suggestedFields.unshift('system.attributes.hp.value');
+      nearby.suggestedFields.length = Math.min(nearby.suggestedFields.length, 5);
+    }
     return { requestedPath, parentPath,
       availableFields: keys.slice(0, 20).map(key => parentPath ? `${parentPath}.${key}` : key),
       truncated: keys.length > 20,
-      ...this._findFieldPaths(parent, parts, requestedPath.split('.').slice(parts.length)) };
+      ...nearby };
+  }
+
+  _hasOwnDataPath(data, parts) {
+    let value = data;
+    for (const part of parts) {
+      const descriptor = value != null ? Object.getOwnPropertyDescriptor(Object(value), part) : undefined;
+      if (!descriptor || !Object.hasOwn(descriptor, 'value')) return false;
+      value = descriptor.value;
+    }
+    return value !== undefined;
   }
 
   // Match the missing path suffix in nearby own data properties; never guess aliases,
