@@ -6,7 +6,7 @@ import { DocumentAPI } from '../../scripts/core/document-api.js';
 import { documentReadRegistry } from '../../scripts/utils/document-read-registry.js';
 import { getTurnToolNames } from '../../scripts/core/turn-capabilities.js';
 
-test('search hands world and pack result arguments directly to read', async t => {
+test('broad partial-name search hands world and pack result arguments directly to read', async t => {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'game');
   globalThis.game = {
     documentTypes: { Actor: ['npc'] },
@@ -27,7 +27,7 @@ test('search hands world and pack result arguments directly to read', async t =>
     observed.push(args);
     return { _id: args[1], name: 'Hero' };
   });
-  const content = (await new DocumentSearchTool().execute({ query: 'Hero' })).content;
+  const content = (await new DocumentSearchTool().execute({ query: 'Her' })).content;
   const handoffs = JSON.parse(content).candidates.map(candidate => candidate.read_document);
   assert.deepEqual(handoffs, [
     { documentType: 'Actor', documentId: 'shared' },

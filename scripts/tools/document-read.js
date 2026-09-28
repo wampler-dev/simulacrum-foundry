@@ -192,7 +192,7 @@ export class DocumentReadTool extends BaseTool {
       }
       selected = { documentType: params.documentType, documentId: id, ...(params.pack ? { pack: params.pack } : {}), fields, fieldSources, missingFields,
         ...(missingFields.length ? { fieldHints,
-          guidance: 'These paths were not found in the available data, not proof the statistic is absent. Check the available fields or read the nearest parent; do not invent a value. Prepared/derived values are read only for explicit system.* paths.' } : {}) };
+          guidance: 'These paths were not found in the available data, not proof the statistic is absent. Retry the read with a relevant suggestedFields path, or inspect the available fields/nearest parent. Suggestions are paths, not returned values; do not invent a value. Prepared/derived values are read only for explicit system.* paths.' } : {}) };
     }
     const json = JSON.stringify(selected, null, 2);
 
@@ -217,7 +217,39 @@ export class DocumentReadTool extends BaseTool {
     const keys = parent && typeof parent === 'object' && !Array.isArray(parent) ? Object.keys(parent) : [];
     return { requestedPath, parentPath,
       availableFields: keys.slice(0, 20).map(key => parentPath ? `${parentPath}.${key}` : key),
-      truncated: keys.length > 20 };
+      truncated: keys.length > 20,
+      ...this._findFieldPaths(parent, parts, requestedPath.split('.').slice(parts.length)) };
+  }
+
+  // Match the missing path suffix in nearby own data properties; never guess aliases,
+  // invoke getters, traverse embedded arrays, or substitute a discovered value.
+  _findFieldPaths(parent, prefix, suffix) {
+    const queue = [{ value: parent, path: prefix, depth: 0 }];
+    const seen = new WeakSet();
+    const suggestedFields = [];
+    let visited = 0;
+    while (queue.length && visited < 100 && suggestedFields.length < 5) {
+      const { value, path, depth } = queue.shift();
+      if (!value || typeof value !== 'object' || Array.isArray(value) || seen.has(value)) continue;
+      seen.add(value);
+      visited++;
+      let target = value;
+      for (const key of suffix) {
+        const descriptor = target != null ? Object.getOwnPropertyDescriptor(Object(target), key) : undefined;
+        target = descriptor && Object.hasOwn(descriptor, 'value') ? descriptor.value : undefined;
+      }
+      if (suffix.length && target !== undefined) suggestedFields.push([...path, ...suffix].join('.'));
+      if (depth >= 2) continue;
+      for (const key of Object.keys(value).slice(0, 100)) {
+        if (queue.length + visited >= 100) break;
+        const descriptor = Object.getOwnPropertyDescriptor(value, key);
+        const child = descriptor && Object.hasOwn(descriptor, 'value') ? descriptor.value : undefined;
+        if (child && typeof child === 'object' && !Array.isArray(child)) {
+          queue.push({ value: child, path: [...path, key], depth: depth + 1 });
+        }
+      }
+    }
+    return { suggestedFields, suggestionSearchLimited: true };
   }
 
   _paginateContent(json, startLine, endLine) {

@@ -42,15 +42,16 @@ test('default name search bounds combined world and pack results and reports lim
   assert.deepEqual(requests[0].options.fields, ['name']);
   const tool = new DocumentSearchTool();
   const message = await tool.execute({ query: 'goblin', maxResults: 3 });
-  assert.match(message.display, /Showing up to 3/);
-  assert.match(message.display, /narrow the search/);
+  assert.match(message.display, /Ambiguous exact name/);
+  assert.match(message.display, /choose a source/);
   const output = JSON.parse(message.content);
-  assert.equal(output.status, 'results');
+  assert.equal(output.status, 'ambiguous');
   assert.equal(output.limitReached, true);
-  assert.equal(output.candidates.length, 3);
-  assert.deepEqual(output.candidates.map(candidate => candidate.source), ['world', 'world', 'world.one']);
-  assert.deepEqual(output.candidates[2].read_document, { documentType: 'Actor', documentId: 'same', pack: 'world.one' });
-  assert.equal(Object.hasOwn(output.candidates[2], 'uuid'), false, 'do not invent a UUID absent from the index');
+  assert.equal(output.candidates.length, 2);
+  assert.deepEqual(output.candidates.map(candidate => candidate.source), ['world', 'world.one']);
+  assert.equal(output.candidates[1].read_document, undefined);
+  assert.equal(output.candidates[1].documentId, 'same');
+  assert.equal(Object.hasOwn(output.candidates[1], 'uuid'), false, 'do not invent a UUID absent from the index');
 });
 
 test('explicit fields, pack selection, and type filter agree with index behavior', async t => {

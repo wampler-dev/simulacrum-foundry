@@ -12,7 +12,7 @@ class DocumentSearchTool extends BaseTool {
   constructor() {
     super(
       'search_documents',
-      'Search document names by default. For a requested book/module, first use list_documents(documentType="Compendium") to select its source package, then list that packageId to obtain its pack IDs, unless already known from tool results. Do not guess pack IDs or substitute a different named document. For an exact named reference, set exact=true and optionally source to "world", a pack ID, or an exact pack title; one match supplies identity only, so read_document is still required for facts. Supply indexed field paths for broad searches where available; compendium search uses the pack index, not full contents. Use list_documents to browse without a query.',
+      'Search document names by default. For a requested book/module, first use list_documents(documentType="Compendium") to select its source package, then list that packageId to obtain its pack IDs, unless already known from tool results. Do not guess pack IDs or substitute a different named document. Broad name searches also report multiple complete-name matches as ambiguous. For an exact named reference, set exact=true and optionally source to "world", a pack ID, or an exact pack title; one match supplies identity only, so read_document is still required for facts. Supply indexed field paths for broad searches where available; compendium search uses the pack index, not full contents. Use list_documents to browse without a query.',
       {
         type: 'object',
         properties: {
@@ -93,6 +93,21 @@ class DocumentSearchTool extends BaseTool {
           display: `${status}. Searched source: ${requestedSource}. ${guidance}`,
         };
       }
+      // A broad name search must not erase ambiguity in complete-name matches.
+      const nameSearch = !Array.isArray(params.fields) || params.fields.length === 0 ||
+        (params.fields.length === 1 && params.fields[0] === 'name');
+      const exactMatches = nameSearch ? results.filter(doc =>
+        typeof doc.name === 'string' && doc.name.trim().toLowerCase() === params.query.trim().toLowerCase()) : [];
+      if (exactMatches.length > 1) {
+        const guidance = 'Multiple documents have this exact name. Ask the user to choose a source/document before reading one as the answer. Do not choose arbitrarily. Repeat the exact search with the chosen source.';
+        return {
+          content: this.formatSearchResults(exactMatches, params.query, {
+            requestedSource, status: 'ambiguous', guidance,
+            limitReached: results.length >= (params.maxResults ?? 50),
+          }),
+          display: `Ambiguous exact name: at least ${exactMatches.length} matches for "${params.query}". Ask the user to choose a source.`,
+        };
+      }
       const maxResults = params.maxResults ?? 50;
       const summary = `${resultCount >= maxResults ? 'Showing up to' : 'Found'} ${resultCount} document${resultCount !== 1 ? 's' : ''} matching "${params.query}" in ${requestedSource}${resultCount >= maxResults ? '; narrow the search for more' : ''}`;
       return {
@@ -129,17 +144,22 @@ class DocumentSearchTool extends BaseTool {
         if (typeof doc.type !== 'string' || typeof id !== 'string' || !id) {
           throw new Error('Search result lacks a usable document type or ID');
         }
-        const sourceTitle = doc.pack && game?.packs?.get?.(doc.pack)?.metadata?.title;
+        const pack = doc.pack && game?.packs?.get?.(doc.pack);
+        const packageId = doc.pack && (pack?.metadata?.packageName || doc.pack.split('.')[0]);
+        const sourceTitle = pack?.title || pack?.metadata?.title;
+        const packageTitle = packageId && (game.modules?.get?.(packageId)?.title ||
+          (game.system?.id === packageId ? game.system.title : undefined));
         return {
           name: doc.name || doc.title || doc._id || 'Untitled',
           source: doc.pack || 'world',
           ...(sourceTitle ? { sourceTitle } : {}),
+          ...(packageTitle ? { packageTitle } : {}),
           ...(doc.uuid ? { uuid: doc.uuid } : {}),
-          read_document: {
+          ...(status === 'ambiguous' ? { documentType: doc.type, documentId: id } : { read_document: {
             documentType: doc.type,
             documentId: id,
             ...(doc.pack ? { pack: doc.pack } : {}),
-          },
+          } }),
         };
       }),
     });
