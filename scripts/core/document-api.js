@@ -999,7 +999,8 @@ export class DocumentAPI {
    * @param {string} id
    * @param {object} [options]
    * @param {boolean} [options.includeEmbedded=true]
-   * @param {Function} [options.onFullDocument] - Optional same-read snapshot for stale checks
+   * @param {Function} [options.onFullDocument] - Optional same-read stored snapshot for stale checks
+   * @param {Function} [options.onPreparedSystem] - Same-read prepared system data for selected display fields
    * @returns {Promise<object>} Plain document object
    */
   static async getDocument(documentType, id, options = {}) {
@@ -1021,6 +1022,7 @@ export class DocumentAPI {
       const obj = doc.toObject();
       if (doc.uuid) obj.uuid = doc.uuid;
       options.onFullDocument?.(obj);
+      options.onPreparedSystem?.(doc.system);
       return this.#selectEmbeddedData({ ...obj }, doc, includeEmbedded);
     }
 
@@ -1054,6 +1056,7 @@ export class DocumentAPI {
     const obj = doc.toObject();
     if (doc.uuid) obj.uuid = doc.uuid;
     options.onFullDocument?.(obj);
+    options.onPreparedSystem?.(doc.system);
     return this.#selectEmbeddedData({ ...obj }, doc, includeEmbedded);
   }
 
