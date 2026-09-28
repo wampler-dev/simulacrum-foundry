@@ -131,6 +131,24 @@ test('same-title and hidden sources cannot be silently selected', async t => {
   assert.match((await tool.execute({ query: 'Goblin', exact: true, fields: ['note'] })).error.message, /limited to the document name/);
 });
 
+test('identical discovered pack IDs in source and pack are accepted; conflicting selectors remain rejected', async t => {
+  setup(t);
+  const tool = new DocumentSearchTool();
+  for (const pack of ['world.one', 'world.two']) {
+    const selected = await tool.execute({ query: 'Goblin', documentTypes: ['Actor'], exact: true, source: pack, pack });
+    assert.equal(selected.error, undefined);
+    const result = JSON.parse(selected.content);
+    assert.equal(result.status, 'unique');
+    assert.deepEqual(result.candidates.map(candidate => candidate.source), [pack]);
+    assert.deepEqual(result.candidates[0].read_document, { documentType: 'Actor', documentId: 'same', pack });
+  }
+  assert.match((await tool.execute({ query: 'Goblin', exact: true, source: 'world.one', pack: 'world.two' })).error.message, /either source or pack/);
+  assert.match((await tool.execute({ query: 'Goblin', exact: true, source: 'Monster Manual', pack: 'world.one' })).error.message, /either source or pack/);
+  assert.match((await tool.execute({ query: 'Goblin', exact: true, source: 'Missing Pack', pack: 'Missing Pack' })).error.message, /either source or pack/);
+  game.packs[0].testUserPermission = () => false;
+  assert.equal(JSON.parse((await tool.execute({ query: 'Goblin', exact: true, source: 'world.one', pack: 'world.one' })).content).status, 'no_match');
+});
+
 test('malformed search hits cannot advertise fabricated read arguments', async t => {
   setup(t);
   t.mock.method(DocumentAPI, 'searchDocuments', async () => [{ type: 'Actor', name: 'Nameless ID' }]);

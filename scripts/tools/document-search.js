@@ -44,7 +44,7 @@ class DocumentSearchTool extends BaseTool {
           },
           source: {
             type: 'string',
-            description: 'For exact matching, restrict to "world", a pack ID, or an exact visible pack title. Do not combine with pack. An unknown or ambiguous source is an error.',
+            description: 'For exact matching without a selected pack ID, restrict to "world" or an exact visible pack title. If discovery supplied a pack ID, use pack and omit source. An unknown or ambiguous source is an error.',
           },
           maxResults: {
             type: 'integer', minimum: 1, maximum: 100,
@@ -63,7 +63,11 @@ class DocumentSearchTool extends BaseTool {
    */
   async execute(params) {
     try {
-      if (params.source !== undefined && params.exact !== true) {
+      // The model sometimes repeats an installed pack ID in both selectors.
+      // Collapse only that identical identity; DocumentAPI still rejects conflicts.
+      const source = params.source === params.pack && typeof params.pack === 'string' &&
+        game?.packs?.get?.(params.pack) ? undefined : params.source;
+      if (source !== undefined && params.exact !== true) {
         throw new Error('source requires exact=true; use pack for broad pack searches');
       }
       const results = await DocumentAPI.searchDocuments({
@@ -72,7 +76,7 @@ class DocumentSearchTool extends BaseTool {
         fields: params.fields,
         maxResults: params.exact === true ? 10 : params.maxResults,
         pack: params.pack,
-        source: params.source,
+        source,
         exact: params.exact === true,
       });
 
