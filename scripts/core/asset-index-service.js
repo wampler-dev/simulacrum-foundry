@@ -18,6 +18,7 @@ const DB_VERSION = 2; // v2: added meta store for completion tracking
 const PROGRESS_LOG_INTERVAL = 10000; // Log progress every N files
 const STALENESS_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 const HEARTBEAT_INTERVAL_MS = 10 * 1000; // 10 seconds
+const STALL_WARNING_MS = 2 * 60 * 1000; // Warn once per period without progress
 
 // Roots that map to 'public' source, everything else is 'data'
 const PUBLIC_ROOTS = ['icons', 'sounds'];
@@ -43,6 +44,10 @@ class AssetIndexService {
     this._initialIndexComplete = false; // True after first full index completes
     this._fileCount = 0;
     this._folderCount = 0;
+    this._indexPath = null;
+    this._indexPhase = null;
+    this._lastProgressAt = null;
+    this._stallWarningIssued = false;
   }
 
   /**
@@ -276,7 +281,17 @@ class AssetIndexService {
    */
   _checkStaleness() {
     // Skip if already indexing
-    if (this.isIndexing) return;
+    if (this.isIndexing) {
+      if (this._lastProgressAt && !this._stallWarningIssued &&
+          Date.now() - this._lastProgressAt >= STALL_WARNING_MS) {
+        this._stallWarningIssued = true;
+        this.logger.warn(
+          `Index rebuild has made no progress for at least 2 minutes at ${this._indexPath ?? 'unknown path'} ` +
+          `(${this._indexPhase ?? 'unknown phase'}; ${this._fileCount} files, ${this._folderCount} folders)`
+        );
+      }
+      return;
+    }
 
     const now = Date.now();
     const isStale =
@@ -309,6 +324,10 @@ class AssetIndexService {
 
     this.isIndexing = true;
     const startTime = Date.now();
+    this._lastProgressAt = startTime;
+    this._stallWarningIssued = false;
+    this._indexPath = null;
+    this._indexPhase = 'clear';
     const isInitialIndex = !this._initialIndexComplete;
     this.logger.info('Starting index rebuild...');
 
@@ -362,6 +381,8 @@ class AssetIndexService {
     }
 
     this.isIndexing = false;
+    this._indexPath = null;
+    this._indexPhase = null;
 
     // Mark initial index as complete and resolve promise
     if (!this._initialIndexComplete) {
@@ -442,6 +463,8 @@ class AssetIndexService {
    */
   async _indexRecursive(source, path) {
     try {
+      this._indexPath = `${source}/${path}`;
+      this._indexPhase = 'browse';
       const result = await getFilePicker().browse(source, path);
 
       // Collect files and folders for this directory
@@ -469,9 +492,12 @@ class AssetIndexService {
       }
 
       // Write this directory's contents to IndexedDB immediately
+      this._indexPhase = 'write';
       await this._writeBatch(files, folders);
       this._fileCount += files.length;
       this._folderCount += folders.length;
+      this._lastProgressAt = Date.now();
+      this._stallWarningIssued = false;
 
       // Log progress periodically
       const totalItems = this._fileCount + this._folderCount;
@@ -512,6 +538,8 @@ class AssetIndexService {
       await this._initialIndexPromise;
     }
 
+    this._requireCompleteIndex();
+
     if (!this.db) {
       return [];
     }
@@ -527,7 +555,7 @@ class AssetIndexService {
       font: ['.ttf', '.otf', '.woff', '.woff2'],
     };
 
-    return new Promise(resolve => {
+    return new Promise((resolve, reject) => {
       const tx = this.db.transaction('files', 'readonly');
       const store = tx.objectStore('files');
       const request = store.openCursor();
@@ -536,7 +564,12 @@ class AssetIndexService {
         const cursor = event.target.result;
 
         if (!cursor) {
-          resolve(results);
+          try {
+            this._requireCompleteIndex();
+            resolve(results);
+          } catch (error) {
+            reject(error);
+          }
           return;
         }
 
@@ -574,7 +607,7 @@ class AssetIndexService {
 
       request.onerror = () => {
         this.logger.error('IndexedDB cursor error during search');
-        resolve(results);
+        reject(new Error('IndexedDB cursor error during search'));
       };
     });
   }
@@ -591,6 +624,8 @@ class AssetIndexService {
       await this._initialIndexPromise;
     }
 
+    this._requireCompleteIndex();
+
     if (!this.db) {
       return [];
     }
@@ -598,7 +633,7 @@ class AssetIndexService {
     const lowerQuery = query.toLowerCase();
     const results = [];
 
-    return new Promise(resolve => {
+    return new Promise((resolve, reject) => {
       const tx = this.db.transaction('folders', 'readonly');
       const store = tx.objectStore('folders');
       const request = store.openCursor();
@@ -607,7 +642,12 @@ class AssetIndexService {
         const cursor = event.target.result;
 
         if (!cursor) {
-          resolve(results);
+          try {
+            this._requireCompleteIndex();
+            resolve(results);
+          } catch (error) {
+            reject(error);
+          }
           return;
         }
 
@@ -636,7 +676,7 @@ class AssetIndexService {
 
       request.onerror = () => {
         this.logger.error('IndexedDB cursor error during folder search');
-        resolve(results);
+        reject(new Error('IndexedDB cursor error during folder search'));
       };
     });
   }
@@ -673,7 +713,19 @@ class AssetIndexService {
       folderCount: this._folderCount,
       lastIndexTime: this.lastIndexTime,
       isIndexing: this.isIndexing,
+      indexPath: this._indexPath,
+      indexPhase: this._indexPhase,
+      lastProgressAt: this._lastProgressAt ? new Date(this._lastProgressAt) : null,
     };
+  }
+
+  _requireCompleteIndex() {
+    const availability = this.getAvailability();
+    if (!availability.available) {
+      const error = new Error(availability.reason);
+      error.code = 'INDEX_UNAVAILABLE';
+      throw error;
+    }
   }
 
   /**
@@ -681,7 +733,7 @@ class AssetIndexService {
    * @returns {boolean}
    */
   isReady() {
-    return this.db !== null && this._initialIndexComplete;
+    return this.getAvailability().available;
   }
 
   /**
@@ -694,6 +746,9 @@ class AssetIndexService {
     }
     if (!this._initialIndexComplete) {
       return { available: false, reason: 'Initial indexing in progress' };
+    }
+    if (this.isIndexing) {
+      return { available: false, reason: 'Asset index rebuild in progress; results may be incomplete' };
     }
     if (!this.isIndexing && this._fileCount === 0 && this._folderCount === 0) {
       return { available: false, reason: 'No files indexed' };

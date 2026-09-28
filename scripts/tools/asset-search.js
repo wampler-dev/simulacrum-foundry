@@ -19,7 +19,7 @@ export class AssetSearchTool extends BaseTool {
           query: {
             type: 'string',
             description:
-              'The filename or path segment to search for (e.g., "potion", "sword.png", "tokens/goblin"). Matches against the full file path.',
+              'A literal filename or path substring (e.g., "goblin", "goblin-warrior", "tokens/goblin"). Prefer a short distinctive fragment: spaces do not match hyphens, and multiword queries are not tokenized.',
           },
           type: {
             type: 'string',
@@ -77,6 +77,13 @@ export class AssetSearchTool extends BaseTool {
 
       return this._formatResults(results, query, stats);
     } catch (error) {
+      if (error.code === 'INDEX_UNAVAILABLE') {
+        return {
+          content: `Asset search unavailable: ${error.message}`,
+          display: `Asset search unavailable: ${error.message}`,
+          error: { message: error.message, type: 'INDEX_UNAVAILABLE' },
+        };
+      }
       return {
         content: `Failed to search assets: ${error.message}`,
         display: `Error searching assets: ${error.message}`,

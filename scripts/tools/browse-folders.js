@@ -83,6 +83,13 @@ export class BrowseFoldersTool extends BaseTool {
         };
       }
     } catch (error) {
+      if (error.code === 'INDEX_UNAVAILABLE') {
+        return {
+          content: `Folder search unavailable: ${error.message}`,
+          display: `Folder search unavailable: ${error.message}`,
+          error: { message: error.message, type: 'INDEX_UNAVAILABLE' },
+        };
+      }
       return {
         content: `Failed to ${action} folders: ${error.message}`,
         display: `Error: ${error.message}`,
