@@ -15,8 +15,9 @@ function setup(t, sourceCount = 12, packsPerSource = 7) {
   const modules = new Map();
   const packs = [];
   for (let i = 0; i < sourceCount; i++) {
-    const id = i === 0 ? 'dnd5e' : i === 1 ? 'dnd-monster-manual' : `source-${i}`;
-    modules.set(id, { title: i === 1 ? 'Dungeons & Dragons Monster Manual' : `Source ${i}` });
+    const id = i === 0 ? 'dnd5e' : i === 1 ? 'dnd-monster-manual' : i === 2 ? 'dnd-dungeon-masters-guide' : `source-${i}`;
+    modules.set(id, { title: i === 1 ? 'Dungeons & Dragons Monster Manual' :
+      i === 2 ? '2024 Dungeon Master’s Guide' : `Source ${i}` });
     for (let j = 0; j < packsPerSource; j++) packs.push({
       collection: `${id}.${j === 0 ? 'actors' : `pack${j}`}`, metadata: { packageName: id, title: j === 0 ? 'Actors' : `Pack ${j}` },
       documentName: j === 0 ? 'Actor' : 'Item', index: { size: 500 },
@@ -60,6 +61,22 @@ test('large catalog preserves Monster Manual source and Actor pack through real 
   assert.equal(selected.kind, 'packs');
   assert.equal(selected.entries.find(e => e.documentType === 'Actor').pack, 'dnd-monster-manual.actors');
   assert.doesNotMatch(JSON.stringify(selected), /dnd5e\./);
+});
+
+test('module IDs in the pack input return bounded source pack choices without loading documents', async t => {
+  const call = setup(t);
+  const sources = await call({ documentType: 'Compendium', filters: { name: 'Monster Manual' } });
+  assert.equal(sources.kind, 'sources');
+  assert.equal(sources.total, 12, 'the current catalog mode does not apply document filters');
+  for (const packageId of ['dnd-monster-manual', 'dnd-dungeon-masters-guide']) {
+    const result = await call({ documentType: 'Actor', pack: packageId });
+    assert.equal(result.kind, 'packs');
+    assert.equal(result.packageId, packageId);
+    assert.equal(result.total, 7);
+    assert.deepEqual(result.entries.filter(entry => entry.documentType === 'Actor').map(entry => entry.pack),
+      [`${packageId}.actors`]);
+    assert.match(result.guidance, /exact pack ID/);
+  }
 });
 
 test('oversized source and pack catalogs page without loss or generic compaction', async t => {

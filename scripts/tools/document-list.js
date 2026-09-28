@@ -43,7 +43,7 @@ class DocumentListTool extends BaseTool {
           pack: {
             type: 'string',
             description:
-              'A specific compendium pack ID to list documents from (copy an ID returned by compendium discovery). When set, only documents from this pack are returned.',
+              'A specific compendium pack ID to list documents from (copy an ID returned by compendium discovery). A packageId is not a pack ID; use documentType="Compendium" with packageId to discover its packs.',
           },
         },
       }
@@ -68,6 +68,17 @@ class DocumentListTool extends BaseTool {
     // If documentType is "Compendium", list available packs
     if (params.documentType === 'Compendium') {
       return this.listCompendiumSources(params);
+    }
+
+    // An exact readable package ID is a source, not a document pack. Return
+    // its existing bounded pack catalog without choosing a pack or loading docs.
+    if (typeof params.pack === 'string' && params.pack && params.filters === undefined &&
+        params.includeCompendiums !== true) {
+      const readablePacks = DocumentAPI.listPacks();
+      if (!readablePacks.some(p => p.id === params.pack) &&
+          readablePacks.some(p => p.packageId === params.pack)) {
+        return this.listCompendiumSources({ packageId: params.pack });
+      }
     }
 
     // Validate document type exists in current system (unless reading from a pack, which might have its own types)

@@ -47,8 +47,19 @@ test('discover same-title installed packs, select exact source, and read without
   assert.match(catalog.content, /dnd5e.*D&D Fifth Edition/);
   const scoped = await list.execute({ documentType: 'Compendium', packageId: 'dnd-monster-manual' });
   assert.deepEqual(JSON.parse(scoped.content).entries, [{ pack: 'dnd-monster-manual.actors', title: 'Actors', documentType: 'Actor' }]);
+  const recovered = await list.execute({ documentType: 'Actor', pack: 'dnd-monster-manual' });
+  assert.deepEqual(JSON.parse(recovered.content).entries, JSON.parse(scoped.content).entries);
+  assert.equal((await list.execute({ documentType: 'Actor', pack: 'unknown-module' })).error.type, 'LIST_FAILED');
+  assert.equal((await list.execute({ documentType: 'Actor', pack: 'hidden' })).error.type, 'LIST_FAILED');
+  assert.equal((await list.execute({ documentType: 'Actor', pack: 'dnd-monster-manual',
+    filters: { name: 'Goblin' } })).error.type, 'LIST_FAILED', 'never ignore requested document filters');
   assert.doesNotMatch(catalog.content, /hidden\.actors/);
   assert.deepEqual(seen, [], 'discovery reads metadata only');
+  const actualPack = await list.execute({ documentType: 'Actor', pack: 'dnd-monster-manual.actors' });
+  assert.equal(actualPack.error, undefined);
+  assert.match(actualPack.content, /Goblin Warrior/);
+  assert.deepEqual(seen, ['dnd-monster-manual.actors'], 'an actual pack ID still lists documents');
+  seen.length = 0;
   const wrong = await search.execute({ query: 'Goblin Warrior', exact: true, pack: 'dnd5e.monsters' });
   assert.equal(JSON.parse(wrong.content).status, 'no_match');
   assert.equal(JSON.parse(wrong.content).requestedSource, 'dnd5e.monsters');
