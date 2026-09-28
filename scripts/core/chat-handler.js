@@ -66,7 +66,10 @@ class ChatHandler {
           display: '🛑 Process cancelled',
           noGroup: true,
         };
-        this.addMessageToUI(cancelMessage, options);
+        // Close the interrupted turn in model history before another user request.
+        this.addMessageToConversation('assistant', cancelMessage.content);
+        await this.conversationManager.save();
+        await this.addMessageToUI(cancelMessage, options);
         return cancelMessage;
       }
 
