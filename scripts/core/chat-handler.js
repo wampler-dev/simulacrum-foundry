@@ -22,9 +22,21 @@ class ChatHandler {
    * Handles the complete flow: user input -> AI -> tools -> UI
    */
   async processUserMessage(message, user, options = {}) {
+    let cancellationRecorded = false;
+    const recordCancellation = () => {
+      if (cancellationRecorded) return;
+      cancellationRecorded = true;
+      if (this.conversationManager.closeCancelledTurn) {
+        this.conversationManager.closeCancelledTurn();
+      } else {
+        this.addMessageToConversation('assistant', 'Process cancelled by user');
+      }
+    };
     try {
+      if (options.signal?.aborted) return;
       // Add user message to conversation state
       this.addMessageToConversation('user', message);
+      options.signal?.addEventListener('abort', recordCancellation, { once: true });
 
       // Notify UI if callback provided
       if (options.onUserMessage) {
@@ -38,6 +50,7 @@ class ChatHandler {
       const finalResponse = await engine.processTurn({
         signal: options.signal,
         onAssistantMessage: async msg => {
+          if (options.signal?.aborted) return;
           // Support ephemeral messages (display only) by checking for either content or display
           if (msg?.role === 'assistant' && (msg?.content || msg?.display)) {
             // Only add to conversation if this is NOT a tool-call response.
@@ -55,6 +68,10 @@ class ChatHandler {
         onToolResult: async toolResult => await this.handleToolResult(toolResult, options),
       });
 
+      if (options.signal?.aborted) {
+        throw Object.assign(new Error('Process was cancelled'), { name: 'AbortError' });
+      }
+
       return finalResponse;
     } catch (error) {
       // Handle cancellation — not an error, just user-initiated stop
@@ -66,8 +83,8 @@ class ChatHandler {
           display: '🛑 Process cancelled',
           noGroup: true,
         };
-        // Close the interrupted turn in model history before another user request.
-        this.addMessageToConversation('assistant', cancelMessage.content);
+        // A signal listener closes the turn at Stop time, even if a tool settles later.
+        recordCancellation();
         await this.conversationManager.save();
         await this.addMessageToUI(cancelMessage, options);
         return cancelMessage;
@@ -117,6 +134,8 @@ class ChatHandler {
       this.addMessageToUI(errorMessage, options);
 
       return errorMessage;
+    } finally {
+      options.signal?.removeEventListener('abort', recordCancellation);
     }
   }
 
@@ -238,6 +257,7 @@ class ChatHandler {
           toolName: toolResult.toolName,
           formattedDisplay,
           content: toolResult.content,
+          cancelled: options.signal?.aborted === true,
         };
 
         // Prefer direct callback if provided (Closed Loop for Active UI)

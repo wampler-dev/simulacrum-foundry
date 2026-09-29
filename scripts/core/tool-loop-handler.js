@@ -145,6 +145,7 @@ async function _runLoopIteration(context) {
     if (hasContent || hasTools) {
       await _notifyAssistantMessage(currentResponse, context);
     }
+    if (context.signal?.aborted) throw new Error('Process was cancelled');
 
     // Emit pending tool state for each tool call AFTER assistant message exists
     // (UI appends pending cards to last assistant message)

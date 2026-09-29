@@ -18,6 +18,9 @@ const COMPACTION_STATUS = Object.freeze({
   COMPACTED: 'compacted',
   FAILED: 'failed',
 });
+const CANCELLED_PENDING_TOOL_RESULT = JSON.stringify({
+  error: 'Process was cancelled by user', cancelled: true, pending: true,
+});
 
 class ConversationManager {
   /**
@@ -62,6 +65,24 @@ class ConversationManager {
    * @param {string} [toolCallId=null] - Optional: The ID of the tool call this message is a response to.
    */
   addMessage(role, content, toolCalls = null, toolCallId = null, metadata = null) {
+    // Stop can close a turn while a previously started tool is still running.
+    // Replace its cancellation placeholder in place so a later user turn never
+    // separates a tool response from the assistant call that owns it.
+    if (role === 'tool' && toolCallId) {
+      const pending = this.activeMessages.find(message =>
+        message.role === 'tool' && message.tool_call_id === toolCallId &&
+        message.content === CANCELLED_PENDING_TOOL_RESULT
+      );
+      if (pending) {
+        this.sessionTokens +=
+          this._estimateTokens({ ...pending, content }) - this._estimateTokens(pending);
+        pending.content = content;
+        this.messages = [...this.activeMessages];
+        interactionLogger.logMessage(pending, { toolCallId, metadata });
+        this._triggerStateChange();
+        return;
+      }
+    }
     const message = { role, content };
     if (metadata) {
       // Support _internal flag for messages that shouldn't be displayed to users
@@ -98,6 +119,24 @@ class ConversationManager {
 
     // Trigger auto-save if callback is provided
     this._triggerStateChange();
+  }
+
+  /** Close an aborted turn immediately, before another user request can start. */
+  closeCancelledTurn() {
+    const start = this.activeMessages.findLastIndex(message => message.role === 'user');
+    if (start < 0) return;
+    const turn = this.activeMessages.slice(start + 1);
+    const answered = new Set(turn.filter(message => message.role === 'tool')
+      .map(message => message.tool_call_id));
+    for (const assistant of turn) {
+      for (const call of assistant.tool_calls || []) {
+        if (call.id && !answered.has(call.id)) {
+          this.addMessage('tool', CANCELLED_PENDING_TOOL_RESULT, null, call.id);
+          answered.add(call.id);
+        }
+      }
+    }
+    this.addMessage('assistant', 'Process cancelled by user');
   }
 
   /**

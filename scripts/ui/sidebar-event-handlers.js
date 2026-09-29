@@ -92,6 +92,7 @@ export class SidebarEventHandlers {
   /* eslint-disable max-lines-per-function */
   static async _processMessageThroughHandler(app, message, signal) {
     await app.ensureChatHandler();
+    if (!app.isCurrentProcess(signal)) return;
 
     if (!app.chatHandler) {
       throw new Error('ChatHandler not available');
@@ -113,6 +114,7 @@ export class SidebarEventHandlers {
 
     // Add user message to chat log
     await app.addMessage('user', message);
+    if (!app.isCurrentProcess(signal)) return;
 
     // Define callbacks for ChatHandler
     /* eslint-disable no-unused-vars */

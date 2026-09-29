@@ -90,3 +90,60 @@ test('new message, streaming, and tool cards sanitize before their DOM sinks', a
   assert.ok(received.some(html => html.includes('tool-justification')));
   assert.ok(received.some(html => html === payload));
 });
+
+test('late cancelled tool result replaces its original card, never the newer turn', async t => {
+  const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  t.after(() => originalDocument
+    ? Object.defineProperty(globalThis, 'document', originalDocument)
+    : delete globalThis.document);
+  globalThis.document = { createElement: () => ({ dataset: {}, outerHTML: '<div>actual result</div>' }) };
+
+  const oldContent = { appended: [], appendChild(node) { this.appended.push(node); } };
+  const newContent = { appended: [], appendChild(node) { this.appended.push(node); } };
+  const oldBubble = {
+    dataset: { messageId: 'old' },
+    querySelector: () => oldContent,
+  };
+  let removed = false;
+  const pending = {
+    dataset: { toolCallId: 'old-call' },
+    closest: () => oldBubble,
+    remove: () => { removed = true; },
+  };
+  const scroll = { querySelectorAll: selector => selector === '.chat-message'
+    ? [oldBubble] : removed ? [] : [pending] };
+  const sidebar = Object.create(SimulacrumSidebarTab.prototype);
+  sidebar.element = { querySelector: () => scroll };
+  sidebar.messages = [
+    { id: 'old', role: 'assistant', display: '' },
+    { id: 'new', role: 'assistant', display: '' },
+  ];
+  sidebar._toolCardOwners = new Map([['old-call', 'old'], ['rerendered-call', 'old']]);
+  sidebar._messageQueue = { add: async work => work() };
+  sidebar._getLastAssistantMessageContent = () => newContent;
+  sidebar._scrollToBottom = () => {};
+
+  await sidebar._addToolResultCard({
+    toolCallId: 'old-call', toolName: 'read_document',
+    formattedDisplay: '<strong>actual result</strong>', cancelled: true,
+  });
+  assert.equal(removed, true);
+  assert.equal(oldContent.appended.length, 1);
+  assert.equal(newContent.appended.length, 0);
+  assert.match(sidebar.messages[0].display, /actual result/);
+  assert.equal(sidebar.messages[1].display, '');
+
+  // Stop rerenders the log and removes the pending spinner before completion.
+  await sidebar._addToolResultCard({
+    toolCallId: 'rerendered-call', toolName: 'read_document',
+    formattedDisplay: 'actual after render', cancelled: true,
+  });
+  assert.equal(oldContent.appended.length, 2);
+  assert.equal(newContent.appended.length, 0);
+
+  await sidebar._addToolResultCard({
+    toolCallId: 'missing-pending', toolName: 'read_document',
+    formattedDisplay: 'late result', cancelled: true,
+  });
+  assert.equal(newContent.appended.length, 0);
+});

@@ -223,6 +223,7 @@ export async function executeToolCalls(toolCalls, context) {
       }
 
       // Execute the tool
+      throwIfAborted(signal);
       const execution = await toolRegistry.executeTool(toolName, parsedArgs);
       result = execution.result;
 

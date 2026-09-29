@@ -91,6 +91,7 @@ export class SimulacrumSidebarTab extends HandlebarsApplicationMixin(AbstractSid
     this.chatHandler = null;
     this.logger = createLogger('SimulacrumSidebarTab');
     this._messageQueue = new SequentialQueue();
+    this._toolCardOwners = new Map();
     // Prompts sent while the agent is busy are queued here (#174) and drained
     // sequentially after each response.
     this._sidebarQueue = new SidebarMessageQueue(this);
@@ -112,9 +113,8 @@ export class SimulacrumSidebarTab extends HandlebarsApplicationMixin(AbstractSid
       this._addPendingToolCard(data);
     });
 
-    // Listen for tool results to remove pending cards
+    // Replace the pending card in the assistant message that owns the call.
     Hooks.on('simulacrumToolResult', data => {
-      this._removePendingToolCard(data.toolCallId);
       this._addToolResultCard(data);
     });
 
@@ -564,6 +564,7 @@ export class SimulacrumSidebarTab extends HandlebarsApplicationMixin(AbstractSid
       }
       if (cm) {
         this.messages = await syncMessagesFromCore(cm);
+        this._toolCardOwners.clear();
         this.#needsScroll = true;
       }
     } catch (_e) {
@@ -894,6 +895,8 @@ export class SimulacrumSidebarTab extends HandlebarsApplicationMixin(AbstractSid
         wrapper.dataset.toolCallId = toolCallId;
         wrapper.innerHTML = sanitizeDisplayHtml(pendingHtml);
         lastAssistantContent.appendChild(wrapper);
+        const ownerId = lastAssistantContent.closest?.('.chat-message')?.dataset.messageId;
+        if (ownerId) this._toolCardOwners?.set(toolCallId, ownerId);
 
         // Scroll to bottom
         this._scrollToBottom();
@@ -928,23 +931,35 @@ export class SimulacrumSidebarTab extends HandlebarsApplicationMixin(AbstractSid
         );
       }
 
-      // Append to last assistant message DOM
-      const lastAssistantContent = this._getLastAssistantMessageContent();
-      if (lastAssistantContent) {
+      const chatScroll = this.element?.[0]?.querySelector('.chat-scroll') ||
+        this.element?.querySelector?.('.chat-scroll');
+      const pendingCards = chatScroll?.querySelectorAll(
+        '.pending-tool-inline, .pending-tool-wrapper'
+      ) || [];
+      const pending = [...pendingCards]
+        .find(element => element.dataset.toolCallId === toolCallId);
+      const ownerId = this._toolCardOwners?.get(toolCallId);
+      const owner = pending?.closest('.chat-message') ||
+        [...(chatScroll?.querySelectorAll('.chat-message') || [])]
+          .find(element => element.dataset.messageId === ownerId);
+      const content = owner?.querySelector('.message-content') ||
+        (data.cancelled ? null : this._getLastAssistantMessageContent());
+      pending?.remove();
+      this._toolCardOwners?.delete(toolCallId);
+      if (content) {
         const wrapper = document.createElement('div');
         wrapper.className = 'content-block tool-card tool-result';
         wrapper.dataset.toolCallId = toolCallId; // Optional: track it
         wrapper.innerHTML = sanitizeDisplayHtml(html);
-        lastAssistantContent.appendChild(wrapper);
+        content.appendChild(wrapper);
         this._scrollToBottom();
 
         // CRITICAL: Update the persistent state so re-renders don't wipe the card
-        if (this.messages.length > 0) {
-          const lastMsg = this.messages[this.messages.length - 1];
-          if (lastMsg.role === 'assistant') {
-            // Append the full block HTML to the display string
-            lastMsg.display = (lastMsg.display || '') + wrapper.outerHTML;
-          }
+        const message = owner
+          ? this.messages.find(entry => entry.id === owner.dataset.messageId)
+          : this.messages.at(-1);
+        if (message?.role === 'assistant') {
+          message.display = (message.display || '') + wrapper.outerHTML;
         }
       }
     });
@@ -972,30 +987,6 @@ export class SimulacrumSidebarTab extends HandlebarsApplicationMixin(AbstractSid
     return lastMsg.querySelector('.message-content');
   }
 
-  /**
-   * Remove a pending tool card when the result arrives
-   * @param {string} toolCallId - The tool call ID to find and remove
-   */
-  _removePendingToolCard(toolCallId) {
-    if (!toolCallId) return;
-
-    this._messageQueue.add(async () => {
-      const chatScroll =
-        this.element?.[0]?.querySelector('.chat-scroll') ||
-        this.element?.querySelector?.('.chat-scroll');
-
-      if (chatScroll) {
-        // Look for inline pending cards (new pattern) or standalone wrappers (legacy)
-        const pendingEl =
-          chatScroll.querySelector(`.pending-tool-inline[data-tool-call-id="${toolCallId}"]`) ||
-          chatScroll.querySelector(`.pending-tool-wrapper[data-tool-call-id="${toolCallId}"]`);
-        if (pendingEl) {
-          pendingEl.remove();
-        }
-      }
-    });
-  }
-
   rollbackUserMessage() {
     if (this.messages.length > 0 && this.messages[this.messages.length - 1]?.role === 'user') {
       this.messages.pop();
@@ -1005,6 +996,7 @@ export class SimulacrumSidebarTab extends HandlebarsApplicationMixin(AbstractSid
 
   async clearMessages() {
     this.messages = [];
+    this._toolCardOwners.clear();
     await this.render({ parts: ['log'] });
   }
 
@@ -1045,6 +1037,9 @@ export class SimulacrumSidebarTab extends HandlebarsApplicationMixin(AbstractSid
     // Abort the current operation if running
     if (this.#currentAbortController) {
       this.#currentAbortController.abort();
+      // The abort listener closes history synchronously. Persist that boundary
+      // before releasing the sidebar for another request.
+      await this.chatHandler?.conversationManager?.save?.();
       this.#currentAbortController = null;
     }
     this.#isRetrying = false;

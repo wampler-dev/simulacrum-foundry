@@ -52,7 +52,11 @@ function setup(t, permission, confirmationAction) {
     },
     currentToolSupport: true,
   };
-  return { requests, history, context, get mutations() { return mutations; } };
+  return {
+    requests, history, context,
+    respond: (id, action) => listeners.get('simulacrumToolConfirmationResponse')?.(id, action),
+    get mutations() { return mutations; },
+  };
 }
 
 for (const name of ['document_copy', 'document_move']) {
@@ -100,3 +104,19 @@ for (const name of ['document_copy', 'document_move']) {
     });
   }
 }
+
+test('Stop immediately after approval prevents an unstarted mutation', async t => {
+  const state = setup(t, 'ask', null);
+  const controller = new AbortController();
+  state.context.signal = controller.signal;
+  const turn = executeToolCalls([{
+    id: 'stopped-copy',
+    function: { name: 'document_copy', arguments: { justification: 'Test', sourceId: 'source' } },
+  }], state.context);
+  assert.equal(state.requests.length, 1);
+  state.respond('stopped-copy', 'allow');
+  // Resolve approval, then abort before the executor resumes after its await.
+  controller.abort();
+  await turn;
+  assert.equal(state.mutations, 0);
+});

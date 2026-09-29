@@ -18,6 +18,7 @@ import {
   buildRetryLabel,
   getRetryDelayMs,
   delayWithSignal,
+  throwIfAborted,
   buildGenericFailureMessage,
 } from '../utils/retry-helpers.js';
 
@@ -51,6 +52,7 @@ class ConversationEngine {
       onAssistantMessage,
       tools,
     });
+    throwIfAborted(signal);
 
     // Pre-tool correction loop (bounded) - handles parse errors and tool call failures
     let attempt = 1;
@@ -87,6 +89,7 @@ class ConversationEngine {
     }
 
     // If parse error persists after retries, return failure message
+    throwIfAborted(signal);
     if (aiResponse && aiResponse._parseError) {
       const errorMessage = buildGenericFailureMessage();
       if (onAssistantMessage) await onAssistantMessage(errorMessage);
