@@ -1133,23 +1133,6 @@ export class DocumentAPI {
 
     if (typeof documentClass.create === 'function') {
       try {
-        // Step 1: Use FoundryVTT's official validation for creation data
-        const validationOptions = {
-          strict: true,
-          fields: true,
-          joint: true,
-        };
-        try {
-          if (typeof documentClass.validate === 'function') {
-            documentClass.validate(data, validationOptions);
-          } else if (documentClass.schema && typeof documentClass.schema.validate === 'function') {
-            documentClass.schema.validate(data, validationOptions);
-          }
-        } catch (validationError) {
-          throw validationError;
-        }
-
-        // Step 2: Proceed with creation only after validation passes
         const created = await documentClass.create(data, { folder });
         return created?.toObject ? created.toObject() : created;
       } catch (createError) {
