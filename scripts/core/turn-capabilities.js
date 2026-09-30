@@ -28,12 +28,12 @@ export function getTurnToolNames(messages) {
   }
   if (readOnly) return allowed;
 
-  if (/\b(create|make|add|generate)\b.{0,80}\b(actor|item|journal|scene|roll table|document|compendium|character|npc|folder)\b/i.test(text)) {
+  if (/\b(create|make|add|generate)\b.{0,80}\b(actor|item|journal|journalentry|scene|roll table|document|compendium|character|npc|folder)\b/i.test(text)) {
     allowed.add('create_document');
     allowed.add('list_document_schemas');
     allowed.add('inspect_document_schema');
   }
-  if (/\b(update|modify|edit|change|set)\b.{0,80}\b(document|actor|item|journal|scene|character|npc|compendium|field|stat|hit points?|hp)\b/i.test(text)) {
+  if (/\b(update|modify|edit|change|set)\b.{0,80}\b(document|actor|item|journal|journalentry|scene|character|npc|compendium|field|stat|hit points?|hp)\b/i.test(text)) {
     allowed.add('update_document');
     allowed.add('inspect_document_schema');
   }
