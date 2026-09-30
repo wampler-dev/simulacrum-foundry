@@ -1,0 +1,76 @@
+name: Build Test Artifact
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Git ref or commit to package
+        required: true
+        default: restart/from-upstream-main
+        type: string
+      artifact_name:
+        description: Unique artifact base name (without .zip)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout requested ref
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_ref }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Policy
+        run: npm run test:policy
+
+      - name: Regression
+        run: npm run test:regression
+
+      - name: Integration
+        run: npm run test:integration
+
+      - name: Security
+        run: npm run test:security
+
+      - name: Static gate
+        id: static
+        continue-on-error: true
+        run: npm run test:static
+
+      - name: Package module
+        run: npm run package:module
+
+      - name: Name artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp dist/simulacrum-1.1.0.zip "${{ inputs.artifact_name }}.zip"
+          unzip -t "${{ inputs.artifact_name }}.zip"
+          sha256sum "${{ inputs.artifact_name }}.zip"
+
+      - name: Upload install ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ inputs.artifact_name }}.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Report static limitation
+        if: always()
+        run: echo "Static step outcome: ${{ steps.static.outcome }}"
